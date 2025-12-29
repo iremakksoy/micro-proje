@@ -1,0 +1,1171 @@
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ; =================================================================
+                      00002 ; DOSYA: main.asm
+                      00003 ; PROJE: Board #2 - Curtain Control System
+                      00004 ; =================================================================
+                      00005 
+                      00006     LIST P=16F877A
+                      00007     INCLUDE "P16F877A.INC"
+                      00001         LIST
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ; Build date : Oct 24 2019
+                      00005 ;  MPASM PIC16F877A processor include
+                      00006 ; 
+                      00007 ;  (c) Copyright 1999-2019 Microchip Technology, All rights reserved
+                      00008 ;==========================================================================
+                      00009 
+                      00567         LIST
+                      00008 
+                      00009     ; Sigorta Ayarlari: HS Osilator, WDT Kapali
+2007   3F72           00010     __CONFIG _FOSC_HS & _WDTE_OFF & _PWRTE_ON & _LVP_OFF & _CP_OFF
+                      00011 
+                      00012     ; Degiskenleri Dahil Et
+                      00013     INCLUDE "variables.inc"
+                      00001 ; =================================================================
+                      00002 ; DOSYA: variables.inc
+                      00003 ; AÇIKLAMA: RAM Degiskenleri ve Sabit Tanimlari
+                      00004 ; =================================================================
+                      00005 
+                      00006     CBLOCK 0x20 ; Genel Amacli Registerlar
+                      00007         ; --- Gecici Degiskenler ---
+  00000020            00008         w_temp          ; W saklayici (Kesme icin)
+  00000021            00009         status_temp     ; STATUS saklayici (Kesme icin)
+  00000022            00010         Math_Temp_H     ; Carpma/Bolme icin Yuksek byte
+  00000023            00011         Math_Temp_L     ; Carpma/Bolme icin Dusuk byte
+  00000024            00012         Delay_1         ; Gecikme sayaci 1
+  00000025            00013         Delay_2         ; Gecikme sayaci 2
+                      00014         
+                      00015         ; --- Sistem Durumu ---
+  00000026            00016         Desired_Curtain ; Istenen Perde Yuzdesi (0-100)
+  00000027            00017         Current_Curtain ; Mevcut Perde Yuzdesi (0-100)
+                      00018         
+                      00019         ; --- Step Motor Kontrolu ---
+  00000028            00020         Target_Steps_H  ; Hedeflenen Adim (High Byte)
+  00000029            00021         Target_Steps_L  ; Hedeflenen Adim (Low Byte)
+  0000002A            00022         Current_Steps_H ; O anki Adim Pozisyonu (High)
+  0000002B            00023         Current_Steps_L ; O anki Adim Pozisyonu (Low)
+  0000002C            00024         Step_Phase      ; Motor adim sirasi (0-3)
+                      00025         
+                      00026         ; --- Sensorler ---
+  0000002D            00027         Light_Value     ; LDR Degeri (0-255 ADC)
+  0000002E            00028         Pot_Value       ; Potansiyometre Ham Degeri
+                      00029         
+                      00030         ; --- UART Tamponu ---
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+  0000002F            00031         UART_Rx_Temp    ; Gelen veri gecici
+  00000030            00032         Curtain_Set_L   ; PC'den gelen ayar (Alt 6 bit)
+  00000031            00033         Curtain_Set_H   ; PC'den gelen ayar (Ust bitler)
+                      00034         
+                      00035         ; --- LCD Cevrimi ---
+  00000032            00036         BCD_Hundreds    ; Yuzler basamagi
+  00000033            00037         BCD_Tens        ; Onlar basamagi
+  00000034            00038         BCD_Ones        ; Birler basamagi
+                      00039     ENDC
+                      00040 
+                      00041 ; --- Sabitler ---
+  0000000A            00042 STEPS_PER_PERCENT EQU d'10' ; Her yuzde 1 icin 10 adim
+  00000096            00043 LDR_THRESHOLD     EQU d'150' ; LDR Esik Degeri
+                      00014 
+                      00015     ORG 0x00
+0000   2???           00016     GOTO System_Init
+                      00017 
+                      00018     ORG 0x04
+0004   2???           00019     GOTO ISR_Routine
+                      00020 
+                      00021 ; -----------------------------------------------------------------
+                      00022 ; KESME SERVIS RUTINI
+                      00023 ; -----------------------------------------------------------------
+0005                  00024 ISR_Routine:
+                      00025     ; Context Saving
+0005   00A0           00026     MOVWF   w_temp
+0006   0E03           00027     SWAPF   STATUS, W
+0007   00A1           00028     MOVWF   status_temp
+                      00029 
+                      00030     ; UART Kesmesi Kontrolu
+0008   1283 1303      00031     BANKSEL PIR1
+000A   1A8C           00032     BTFSC   PIR1, RCIF
+000B   2???           00033     CALL    UART_Receive_Handler
+                      00034 
+                      00035     ; Context Restore
+000C   0E21           00036     SWAPF   status_temp, W
+000D   0083           00037     MOVWF   STATUS
+000E   0EA0           00038     SWAPF   w_temp, F
+000F   0E20           00039     SWAPF   w_temp, W
+0010   0009           00040     RETFIE
+                      00041 
+                      00042 ; -----------------------------------------------------------------
+                      00043 ; SISTEM KURULUMU
+                      00044 ; -----------------------------------------------------------------
+0011                  00045 System_Init:
+                      00046     ; --- Port Ayarlari ---
+0011   1683 1303      00047     BANKSEL TRISA
+0013   30FF           00048     MOVLW   b'11111111' ; PORTA Giris (LDR, Pot)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0014   0085           00049     MOVWF   TRISA
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0015   0186           00050     CLRF    TRISB       ; PORTB Cikis (Step Motor)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0016   0188           00051     CLRF    TRISD       ; PORTD Cikis (LCD Data)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0017   0189           00052     CLRF    TRISE       ; PORTE Cikis (LCD Kontrol: RS, EN, RW)
+                      00053     
+                      00054     ; UART Pinleri (RC6 TX, RC7 RX)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0018   1787           00055     BSF     TRISC, 7    ; RX Giris
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0019   1307           00056     BCF     TRISC, 6    ; TX Cikis
+                      00057 
+                      00058     ; ADC Ayarlari (Sola Dayali = Left Justified icin en bastaki bit 0 olmali)
+                      00059     ; Eski hatali: b'10000010' -> Yeni dogru: b'00000010'
+001A   3002           00060     MOVLW   b'00000010' 
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+001B   009F           00061     MOVWF   ADCON1
+                      00062     
+                      00063     ; --- RW PININI GND YAPMA (Yazilimsal) ---
+001C   1283 1303      00064     BANKSEL PORTE
+001E   1109           00065     BCF     PORTE, 2    ; RE2 (RW) pinini 0 yap -> Yazma Modu Aktif
+                      00066     
+                      00067     ; --- Modulleri Baslat ---
+001F   1283 1303      00068     BANKSEL PORTA
+0021   2???           00069     CALL    LCD_Init
+0022   2???           00070     CALL    UART_Init
+                      00071     
+                      00072     ; --- Degisken Sifirlama ---
+0023   01A7           00073     CLRF    Current_Curtain
+0024   01A6           00074     CLRF    Desired_Curtain
+0025   01AC           00075     CLRF    Step_Phase
+0026   01AB           00076     CLRF    Current_Steps_L
+0027   01AA           00077     CLRF    Current_Steps_H
+                      00078     
+                      00079     ; LCD Arayuzunu Ciz
+0028   2???           00080     CALL    LCD_Draw_Interface
+                      00081     
+                      00082     ; Kesmeleri Ac
+0029   1683 1303      00083     BANKSEL PIE1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+002B   168C           00084     BSF     PIE1, RCIE
+002C   1283 1303      00085     BANKSEL INTCON
+002E   178B           00086     BSF     INTCON, GIE
+002F   170B           00087     BSF     INTCON, PEIE
+                      00088 ; -----------------------------------------------------------------
+                      00089 ; ANA DONGU
+                      00090 ; -----------------------------------------------------------------
+0030                  00091 MainLoop:
+                      00092     ; 1. Sensorleri Oku
+0030   2???           00093     CALL    Read_LDR
+0031   2???           00094     CALL    Read_Pot
+                      00095 
+                      00096     ; 2. Otomatik Kontrol (LDR Esik Kontrolu)
+                      00097     ; Simülasyon LDR devresi: Karanlik = Yuksek Voltaj (ADC > Esik)
+                      00098     ; Aydinlik = Dusuk Voltaj (ADC < Esik)
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00099     
+0032   3096           00100     MOVLW   LDR_THRESHOLD   ; Esik degeri (Orn: 50 veya 150 yapabilirsin)
+0033   022D           00101     SUBWF   Light_Value, W  ; W = Light - Threshold
+                      00102     
+                      00103     ; Eger Light > Threshold (Karanlik) ise sonuc Pozitif, C=1 olur.
+                      00104     ; Eger Light < Threshold (Aydinlik) ise sonuc Negatif, C=0 olur.
+                      00105     
+0034   1803           00106     BTFSC   STATUS, C       ; C=0 ise (Aydinlik) atla, Motor Kontrole git
+0035   2???           00107     GOTO    Force_Close     ; C=1 ise (Karanlik), Zorla Kapat
+0036   2???           00108     GOTO    Control_Motor   ; Aydinlik, normal pot kontrolune git
+                      00109 
+0037                  00110 Force_Close:
+0037   3064           00111     MOVLW   d'100'
+0038   00A6           00112     MOVWF   Desired_Curtain
+0039   2???           00113     GOTO    Motor_Manager_Call ; Direkt motor surmeye git (Pot okumayi ez)
+                      00114 
+003A                  00115 Control_Motor:
+                      00116     ; Potansiyometre degeri zaten Read_Pot ile Desired_Curtain'e yazildi.
+                      00117     ; Burada ekstra bir islem yapmaya gerek yok.
+                      00118 
+003A                  00119 Motor_Manager_Call:
+                      00120     ; 3. Motor Yonetimi
+003A   2???           00121     CALL    Motor_Manager
+                      00122 
+                      00123     ; 4. Ekran Guncelleme
+003B   2???           00124     CALL    LCD_Update_Values
+                      00125     
+003C   2???           00126     GOTO    MainLoop
+                      00127 
+                      00128 ; -----------------------------------------------------------------
+                      00129 ; MODULLERIN DAHIL EDILMESI
+                      00130 ; -----------------------------------------------------------------
+                      00131     INCLUDE "lcd_module.asm"
+                      00001 ; =================================================================
+                      00002 ; DOSYA: LCD_Module.asm
+                      00003 ; AÇIKLAMA: LCD Sürücüsü (PORTD Data, RE0/RE1 Control)
+                      00004 ; =================================================================
+                      00005 
+003D                  00006 LCD_Init:
+                      00007     ; 15ms Bekle
+003D   2???           00008     CALL    Delay_Long
+                      00009     
+003E   3038           00010     MOVLW   b'00111000' ; Function Set: 8-bit, 2 Line, 5x7 Dots
+003F   2???           00011     CALL    Send_Cmd
+                      00012     
+0040   300C           00013     MOVLW   b'00001100' ; Display On, Cursor Off
+0041   2???           00014     CALL    Send_Cmd
+                      00015     
+0042   3006           00016     MOVLW   b'00000110' ; Entry Mode: Increment
+0043   2???           00017     CALL    Send_Cmd
+                      00018     
+0044   3001           00019     MOVLW   b'00000001' ; Clear Display
+0045   2???           00020     CALL    Send_Cmd
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0046   0008           00021     RETURN
+                      00022 
+0047                  00023 LCD_Draw_Interface:
+0047   3080           00024     MOVLW   0x80        ; Sat?r 1
+0048   2???           00025     CALL    Send_Cmd
+0049   3043           00026     MOVLW   'C'
+004A   2???           00027     CALL    Send_Data
+004B   3075           00028     MOVLW   'u'
+004C   2???           00029     CALL    Send_Data
+004D   3072           00030     MOVLW   'r'
+004E   2???           00031     CALL    Send_Data
+004F   3074           00032     MOVLW   't'
+0050   2???           00033     CALL    Send_Data
+0051   303A           00034     MOVLW   ':'
+0052   2???           00035     CALL    Send_Data
+                      00036     
+0053   30C0           00037     MOVLW   0xC0        ; Sat?r 2
+0054   2???           00038     CALL    Send_Cmd
+0055   304C           00039     MOVLW   'L'
+0056   2???           00040     CALL    Send_Data
+0057   3069           00041     MOVLW   'i'
+0058   2???           00042     CALL    Send_Data
+0059   3067           00043     MOVLW   'g'
+005A   2???           00044     CALL    Send_Data
+005B   3068           00045     MOVLW   'h'
+005C   2???           00046     CALL    Send_Data
+005D   3074           00047     MOVLW   't'
+005E   2???           00048     CALL    Send_Data
+005F   303A           00049     MOVLW   ':'
+0060   2???           00050     CALL    Send_Data
+0061   0008           00051     RETURN
+                      00052 
+0062                  00053 LCD_Update_Values:
+                      00054     ; Perde De?erini Yaz (Sat?r 1, 8. karakter)
+0062   3087           00055     MOVLW   0x87
+0063   2???           00056     CALL    Send_Cmd
+0064   0827           00057     MOVF    Current_Curtain, W
+0065   2???           00058     CALL    BinToDec
+0066   3025           00059     MOVLW   '%'
+0067   2???           00060     CALL    Send_Data
+                      00061     
+                      00062     ; I??k De?erini Yaz (Sat?r 2, 7. karakter)
+0068   30C7           00063     MOVLW   0xC7
+0069   2???           00064     CALL    Send_Cmd
+006A   082D           00065     MOVF    Light_Value, W
+006B   2???           00066     CALL    BinToDec
+006C   0008           00067     RETURN
+                      00068 
+                      00069 ; --- YARDIMCI RUT?NLER ---
+006D                  00070 Send_Cmd:
+006D   1283 1303      00071     BANKSEL PORTD
+006F   0088           00072     MOVWF   PORTD
+0070   1009           00073     BCF     PORTE, 0    ; RS = 0 (Command)
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0071   1489           00074     BSF     PORTE, 1    ; E = 1
+0072   0000           00075     NOP
+0073   1089           00076     BCF     PORTE, 1    ; E = 0
+0074   2???           00077     CALL    Delay_Short
+0075   0008           00078     RETURN
+                      00079 
+0076                  00080 Send_Data:
+0076   1283 1303      00081     BANKSEL PORTD
+0078   0088           00082     MOVWF   PORTD
+0079   1409           00083     BSF     PORTE, 0    ; RS = 1 (Data)
+007A   1489           00084     BSF     PORTE, 1    ; E = 1
+007B   0000           00085     NOP
+007C   1089           00086     BCF     PORTE, 1    ; E = 0
+007D   2???           00087     CALL    Delay_Short
+007E   0008           00088     RETURN
+                      00089 
+007F                  00090 Delay_Short:
+007F   3032           00091     MOVLW   d'50'
+0080   00A4           00092     MOVWF   Delay_1
+0081   0BA4           00093 Loop_S: DECFSZ Delay_1, F
+0082   2???           00094     GOTO    Loop_S
+0083   0008           00095     RETURN
+                      00096 
+0084                  00097 Delay_Long:
+0084   30FF           00098     MOVLW   d'255'
+0085   00A4           00099     MOVWF   Delay_1
+0086   0BA4           00100 Loop_L: DECFSZ Delay_1, F
+0087   2???           00101     GOTO    Loop_L
+0088   0008           00102     RETURN
+                      00103 
+                      00104 ; --- BINARY TO DECIMAL DÖNÜ?ÜM VE YAZDIRMA ---
+                      00105 ; W register'daki 0-255 aras? say?y? ekrana basar (3 hane)
+0089                  00106 BinToDec:
+0089   00A0           00107     MOVWF   w_temp      ; Say?y? sakla
+008A   01B2           00108     CLRF    BCD_Hundreds
+008B   01B3           00109     CLRF    BCD_Tens
+008C   01B4           00110     CLRF    BCD_Ones
+                      00111     
+                      00112     ; Yüzler Basama??
+008D                  00113 Calc_100:
+008D   3064           00114     MOVLW   d'100'
+008E   0220           00115     SUBWF   w_temp, W
+008F   1C03           00116     BTFSS   STATUS, C
+0090   2???           00117     GOTO    Calc_10
+0091   00A0           00118     MOVWF   w_temp
+0092   0AB2           00119     INCF    BCD_Hundreds, F
+0093   2???           00120     GOTO    Calc_100
+                      00121     
+                      00122     ; Onlar Basama??
+0094                  00123 Calc_10:
+0094   300A           00124     MOVLW   d'10'
+0095   0220           00125     SUBWF   w_temp, W
+0096   1C03           00126     BTFSS   STATUS, C
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0097   2???           00127     GOTO    Calc_1
+0098   00A0           00128     MOVWF   w_temp
+0099   0AB3           00129     INCF    BCD_Tens, F
+009A   2???           00130     GOTO    Calc_10
+                      00131     
+                      00132     ; Birler Basama??
+009B                  00133 Calc_1:
+009B   0820           00134     MOVF    w_temp, W
+009C   00B4           00135     MOVWF   BCD_Ones
+                      00136     
+                      00137     ; Yazd?r (ASCII = Rakam + 0x30)
+009D   0832           00138     MOVF    BCD_Hundreds, W
+009E   3E30           00139     ADDLW   0x30
+009F   2???           00140     CALL    Send_Data
+                      00141     
+00A0   0833           00142     MOVF    BCD_Tens, W
+00A1   3E30           00143     ADDLW   0x30
+00A2   2???           00144     CALL    Send_Data
+                      00145     
+00A3   0834           00146     MOVF    BCD_Ones, W
+00A4   3E30           00147     ADDLW   0x30
+00A5   2???           00148     CALL    Send_Data
+00A6   0008           00149     RETURN
+                      00150 
+                      00151 
+                      00132     INCLUDE "stepmotor.asm"
+                      00001 ; =================================================================
+                      00002 ; DOSYA: stepmotor.asm
+                      00003 ; AÇIKLAMA: Step Motor Surucusu (PORTB) - Gecikmeli ve Oranli
+                      00004 ; =================================================================
+                      00005 
+00A7                  00006 Motor_Manager:
+                      00007     ; Hedef ve Mevcut Perde Durumunu Karsilastir
+00A7   0826           00008     MOVF    Desired_Curtain, W
+00A8   0227           00009     SUBWF   Current_Curtain, W
+00A9   1903           00010     BTFSC   STATUS, Z
+00AA   0008           00011     RETURN              ; Esitse islem yapma, cik.
+                      00012 
+                      00013     ; Esit Degilse Yon Belirle
+                      00014     ; Carry=0 ise (Current < Desired) -> Sonuc Negatif -> Perdeyi KAPAT (Arttir)
+                      00015     ; Carry=1 ise (Current > Desired) -> Sonuc Pozitif -> Perdeyi AC (Azalt)
+                      00016     
+00AB   1C03           00017     BTFSS   STATUS, C   ; C=0 ise atlama yapma (Kapatmaya git)
+00AC   2???           00018     GOTO    Move_Close
+                      00019     
+00AD                  00020 Move_Open:
+                      00021     ; Perde Aciliyor (Yuzde azalmali)
+                      00022     ; %1 degisim icin 10 adim atmamiz gerekiyor (1000 adim = %100)
+00AD   2???           00023     CALL    Step_10_Times_CW
+00AE   03A7           00024     DECF    Current_Curtain, F  ; Perde yuzdesini 1 azalt
+00AF   0008           00025     RETURN
+                      00026 
+00B0                  00027 Move_Close:
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00028     ; Perde Kapaniyor (Yuzde artmali)
+00B0   2???           00029     CALL    Step_10_Times_CCW
+00B1   0AA7           00030     INCF    Current_Curtain, F  ; Perde yuzdesini 1 arttir
+00B2   0008           00031     RETURN
+                      00032 
+                      00033 ; --- 10 ADIM ATMA ALT PROGRAMLARI ---
+00B3                  00034 Step_10_Times_CW:
+00B3   300A           00035     MOVLW   d'10'
+00B4   00A3           00036     MOVWF   Math_Temp_L ; Sayac olarak kullanalim
+00B5                  00037 Loop_CW:
+00B5   2???           00038     CALL    Step_One_CW
+00B6   0BA3           00039     DECFSZ  Math_Temp_L, F
+00B7   2???           00040     GOTO    Loop_CW
+00B8   0008           00041     RETURN
+                      00042 
+00B9                  00043 Step_10_Times_CCW:
+00B9   300A           00044     MOVLW   d'10'
+00BA   00A3           00045     MOVWF   Math_Temp_L
+00BB                  00046 Loop_CCW:
+00BB   2???           00047     CALL    Step_One_CCW
+00BC   0BA3           00048     DECFSZ  Math_Temp_L, F
+00BD   2???           00049     GOTO    Loop_CCW
+00BE   0008           00050     RETURN
+                      00051 
+                      00052 ; --- TEK ADIM RUTINLERI ---
+00BF                  00053 Step_One_CW:
+00BF   0AAC           00054     INCF    Step_Phase, F
+00C0   3003           00055     MOVLW   b'00000011'
+00C1   05AC           00056     ANDWF   Step_Phase, F ; 0-3 arasinda tut (Modulo 4)
+00C2   2???           00057     CALL    Activate_Coils
+00C3   2???           00058     CALL    Delay_Motor_Safe ; Yavaslatilmis gecikme
+00C4   0008           00059     RETURN
+                      00060 
+00C5                  00061 Step_One_CCW:
+00C5   03AC           00062     DECF    Step_Phase, F
+00C6   3003           00063     MOVLW   b'00000011'
+00C7   05AC           00064     ANDWF   Step_Phase, F
+00C8   2???           00065     CALL    Activate_Coils
+00C9   2???           00066     CALL    Delay_Motor_Safe
+00CA   0008           00067     RETURN
+                      00068 
+00CB                  00069 Activate_Coils:
+00CB   082C           00070     MOVF    Step_Phase, W
+00CC   2???           00071     CALL    Step_Table
+00CD   1283 1303      00072     BANKSEL PORTB
+00CF   0086           00073     MOVWF   PORTB
+00D0   0008           00074     RETURN
+                      00075 
+00D1                  00076 Step_Table:
+00D1   0782           00077     ADDWF   PCL, F
+00D2   3401           00078     RETLW   b'00000001' ; Adim 1 (RB0)
+00D3   3402           00079     RETLW   b'00000010' ; Adim 2 (RB1)
+00D4   3404           00080     RETLW   b'00000100' ; Adim 3 (RB2)
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00D5   3408           00081     RETLW   b'00001000' ; Adim 4 (RB3)
+                      00082 
+                      00083 ; --- GECIKME (MOTORUN DONMESI ICIN KRITIK) ---
+00D6                  00084 Delay_Motor_Safe:
+                      00085     ; Yaklasik 3-5ms gecikme saglayalim.
+                      00086     ; Icerideki dongu 255 tur, disaridaki 15 tur.
+00D6   300F           00087     MOVLW   d'15'
+00D7   00A5           00088     MOVWF   Delay_2
+00D8                  00089 Out_Loop:
+00D8   30FF           00090     MOVLW   d'255'
+00D9   00A4           00091     MOVWF   Delay_1
+00DA                  00092 In_Loop:
+00DA   0BA4           00093     DECFSZ  Delay_1, F
+00DB   2???           00094     GOTO    In_Loop
+00DC   0BA5           00095     DECFSZ  Delay_2, F
+00DD   2???           00096     GOTO    Out_Loop
+00DE   0008           00097     RETURN
+                      00133     INCLUDE "sensors.asm"
+                      00001 ; =================================================================
+                      00002 ; DOSYA: sensors.asm
+                      00003 ; AÇIKLAMA: ADC Okuma Rutinleri (Guvenli Beklemeli)
+                      00004 ; =================================================================
+                      00005 
+                      00006 ; --- LDR OKUMA (Kanal 0) ---
+00DF                  00007 Read_LDR:
+00DF   1283 1303      00008     BANKSEL ADCON0
+00E1   3081           00009     MOVLW   b'10000001' ; Fosc/32, Kanal 0 (AN0), ADC On
+00E2   009F           00010     MOVWF   ADCON0
+                      00011     
+00E3   2???           00012     CALL    ADC_Safe_Wait ; KANAL DEGISTIKTEN SONRA BEKLE!
+                      00013     
+00E4   151F           00014     BSF     ADCON0, GO  ; Cevirimi baslat
+00E5                  00015 Wait_LDR_Done:
+00E5   191F           00016     BTFSC   ADCON0, GO
+00E6   2???           00017     GOTO    Wait_LDR_Done
+                      00018     
+00E7   1283 1303      00019     BANKSEL ADRESH
+00E9   081E           00020     MOVF    ADRESH, W
+00EA   1283 1303      00021     BANKSEL Light_Value
+00EC   00AD           00022     MOVWF   Light_Value
+00ED   0008           00023     RETURN
+                      00024 
+                      00025 ; --- POTANSIYOMETRE OKUMA (Kanal 1) ---
+00EE                  00026 Read_Pot:
+00EE   1283 1303      00027     BANKSEL ADCON0
+00F0   3089           00028     MOVLW   b'10001001' ; Fosc/32, Kanal 1 (AN1), ADC On
+00F1   009F           00029     MOVWF   ADCON0
+                      00030     
+00F2   2???           00031     CALL    ADC_Safe_Wait ; KONDANSATORUN SARJ OLMASI ICIN BEKLE!
+                      00032     
+00F3   151F           00033     BSF     ADCON0, GO  ; Cevirimi baslat
+00F4                  00034 Wait_Pot_Done:
+00F4   191F           00035     BTFSC   ADCON0, GO
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00F5   2???           00036     GOTO    Wait_Pot_Done
+                      00037     
+00F6   1283 1303      00038     BANKSEL ADRESH
+00F8   081E           00039     MOVF    ADRESH, W
+00F9   1283 1303      00040     BANKSEL Pot_Value
+00FB   00AE           00041     MOVWF   Pot_Value
+                      00042     
+                      00043     ; --- OLCEKLEME (0-255 -> 0-100) ---
+                      00044     ; Basit yontem: Degeri 2'ye bol ve 100'e sinirla
+00FC   1003           00045     BCF     STATUS, C
+00FD   0C2E           00046     RRF     Pot_Value, W ; W = Pot / 2
+00FE   00A6           00047     MOVWF   Desired_Curtain
+                      00048     
+                      00049     ; Eger sonuc > 100 ise, 100 yap
+00FF   3064           00050     MOVLW   d'100'
+0100   0226           00051     SUBWF   Desired_Curtain, W
+0101   1803           00052     BTFSC   STATUS, C    ; Desired >= 100 ise C=1 olur
+0102   2???           00053     GOTO    Fix_100
+0103   0008           00054     RETURN
+                      00055 
+0104                  00056 Fix_100:
+0104   3064           00057     MOVLW   d'100'
+0105   00A6           00058     MOVWF   Desired_Curtain
+0106   0008           00059     RETURN
+                      00060 
+                      00061 ; --- GUVENLI BEKLEME RUTINI ---
+                      00062 ; ADC kanal gecislerinde kapasitorun sarj olmasi icin
+                      00063 ; mutlaka yeterli sure (yaklasik 20-50us) beklenmelidir.
+0107                  00064 ADC_Safe_Wait:
+0107   3032           00065     MOVLW   d'50'       ; Biraz uzun tutalim ki garanti olsun
+0108   00A0           00066     MOVWF   w_temp      ; Gecici sayac olarak w_temp kullanalim
+0109                  00067 ADC_Loop:
+0109   0BA0           00068     DECFSZ  w_temp, F
+010A   2???           00069     GOTO    ADC_Loop
+010B   0008           00070     RETURN
+                      00134     INCLUDE "uart.asm"
+                      00001 ; =================================================================
+                      00002 ; DOSYA: UART_Module.asm
+                      00003 ; AÇIKLAMA: 9600 Baud Serial Haberle?me
+                      00004 ; =================================================================
+                      00005 
+010C                  00006 UART_Init:
+010C   1683 1303      00007     BANKSEL SPBRG
+010E   3019           00008     MOVLW   d'25'       ; 9600 Baud @ 4MHz (BRGH=1)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+010F   0099           00009     MOVWF   SPBRG
+                      00010     
+0110   3024           00011     MOVLW   b'00100100' ; TXEN, High Speed
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0111   0098           00012     MOVWF   TXSTA
+                      00013     
+0112   1283 1303      00014     BANKSEL RCSTA
+0114   3090           00015     MOVLW   b'10010000' ; SPEN, CREN
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0115   0098           00016     MOVWF   RCSTA
+0116   0008           00017     RETURN
+                      00018 
+0117                  00019 UART_Receive_Handler:
+0117   1283 1303      00020     BANKSEL RCREG
+0119   081A           00021     MOVF    RCREG, W
+011A   00AF           00022     MOVWF   UART_Rx_Temp
+                      00023     
+                      00024     ; --- KOMUT AYRI?TIRMA (Sayfa 19 Tablo) ---
+                      00025     
+                      00026     ; 1. Get Desired Curtain (Fraction/Low) -> Bizde ondal?k yok, 0 dönebiliriz.
+011B   082F           00027     MOVF    UART_Rx_Temp, W
+011C   3A01           00028     XORLW   b'00000001'
+011D   1903           00029     BTFSC   STATUS, Z
+011E   2???           00030     GOTO    Send_Zero   ; Ondal?k k?s?m yok
+                      00031     
+                      00032     ; 2. Get Desired Curtain (Integral/High)
+011F   082F           00033     MOVF    UART_Rx_Temp, W
+0120   3A02           00034     XORLW   b'00000010'
+0121   1903           00035     BTFSC   STATUS, Z
+0122   2???           00036     GOTO    Send_Desired
+                      00037     
+                      00038     ; 3. Get Light Intensity (High Byte)
+0123   082F           00039     MOVF    UART_Rx_Temp, W
+0124   3A08           00040     XORLW   b'00001000' ; Tabloya göre ID
+0125   1903           00041     BTFSC   STATUS, Z
+0126   2???           00042     GOTO    Send_Light
+                      00043     
+                      00044     ; --- SET COMMANDS (Maskeleme Gerekir) ---
+                      00045     
+                      00046     ; Set Desired Low (10xxxxxx)
+0127   082F           00047     MOVF    UART_Rx_Temp, W
+0128   39C0           00048     ANDLW   b'11000000' ; Üst iki bite bak
+0129   3A80           00049     XORLW   b'10000000' ; 10 ile ba?l?yor mu?
+012A   1903           00050     BTFSC   STATUS, Z
+012B   2???           00051     GOTO    Store_Low_Bits
+                      00052     
+                      00053     ; Set Desired High (11xxxxxx)
+012C   082F           00054     MOVF    UART_Rx_Temp, W
+012D   39C0           00055     ANDLW   b'11000000'
+012E   3AC0           00056     XORLW   b'11000000' ; 11 ile ba?l?yor mu?
+012F   1903           00057     BTFSC   STATUS, Z
+0130   2???           00058     GOTO    Store_High_Bits
+                      00059     
+0131   0008           00060     RETURN
+                      00061 
+                      00062 ; --- CEVAP RUT?NLER? ---
+0132                  00063 Send_Zero:
+0132   3000           00064     MOVLW   d'0'
+0133   2???           00065     CALL    UART_Tx
+0134   0008           00066     RETURN
+                      00067 
+0135                  00068 Send_Desired:
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0135   0826           00069     MOVF    Desired_Curtain, W
+0136   2???           00070     CALL    UART_Tx
+0137   0008           00071     RETURN
+                      00072 
+0138                  00073 Send_Light:
+0138   082D           00074     MOVF    Light_Value, W
+0139   2???           00075     CALL    UART_Tx
+013A   0008           00076     RETURN
+                      00077 
+                      00078 ; --- KAYIT RUT?NLER? ---
+013B                  00079 Store_Low_Bits:
+                      00080     ; 10xxxxxx -> Alt 6 bit
+013B   082F           00081     MOVF    UART_Rx_Temp, W
+013C   393F           00082     ANDLW   b'00111111'
+013D   00B0           00083     MOVWF   Curtain_Set_L
+013E   0008           00084     RETURN
+                      00085 
+013F                  00086 Store_High_Bits:
+                      00087     ; 11xxxxxx -> Üst bitler
+                      00088     ; PDF protokolü biraz karma??k, basitlik için:
+                      00089     ; Gelen verinin alt 6 bitini al, Low ile birle?tir.
+                      00090     ; Burada sadece High byte geldi?inde güncelleme yapal?m.
+013F   082F           00091     MOVF    UART_Rx_Temp, W
+0140   393F           00092     ANDLW   b'00111111'
+                      00093     ; Normalde shift gerekir ama proje basitli?i için 
+                      00094     ; direkt bu de?eri Desired olarak atayal?m (0-63 aras? kontrol eder)
+                      00095     ; VEYA Curtain_Set_L ile birle?tirme yap?lmal?.
+                      00096     
+0141   00A6           00097     MOVWF   Desired_Curtain ; Basitle?tirilmi? kabul.
+0142   0008           00098     RETURN
+                      00099 
+0143                  00100 UART_Tx:
+0143   1683 1303      00101     BANKSEL TXSTA
+0145                  00102 Tx_Wait:
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0145   1C98           00103     BTFSS   TXSTA, TRMT
+0146   2???           00104     GOTO    Tx_Wait
+0147   1283 1303      00105     BANKSEL TXREG
+0149   0099           00106     MOVWF   TXREG
+014A   0008           00107     RETURN
+                      00108 
+                      00109 
+                      00135 
+3F72                  00136     END
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 13
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADCS2                             00000006
+ADC_Loop                          00000109
+ADC_Safe_Wait                     00000107
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+Activate_Coils                    000000CB
+BCD_Hundreds                      00000032
+BCD_Ones                          00000034
+BCD_Tens                          00000033
+BCLIE                             00000003
+BCLIF                             00000003
+BF                                00000000
+BRGH                              00000002
+BinToDec                          00000089
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCP2CON                           0000001D
+CCP2IE                            00000000
+CCP2IF                            00000000
+CCP2M0                            00000000
+CCP2M1                            00000001
+CCP2M2                            00000002
+CCP2M3                            00000003
+CCP2X                             00000005
+CCP2Y                             00000004
+CCPR1                             00000015
+CCPR1H                            00000016
+CCPR1L                            00000015
+CCPR2                             0000001B
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 14
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CCPR2H                            0000001C
+CCPR2L                            0000001B
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CIS                               00000003
+CKE                               00000006
+CKP                               00000004
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000009C
+CMIE                              00000006
+CMIF                              00000006
+CREN                              00000004
+CSRC                              00000007
+CVR0                              00000000
+CVR1                              00000001
+CVR2                              00000002
+CVR3                              00000003
+CVRCON                            0000009D
+CVREN                             00000007
+CVROE                             00000006
+CVRR                              00000005
+Calc_1                            0000009B
+Calc_10                           00000094
+Calc_100                          0000008D
+Control_Motor                     0000003A
+Current_Curtain                   00000027
+Current_Steps_H                   0000002A
+Current_Steps_L                   0000002B
+Curtain_Set_H                     00000031
+Curtain_Set_L                     00000030
+D                                 00000005
+DATA_ADDRESS                      00000005
+DC                                00000001
+D_A                               00000005
+D_NOT_A                           00000005
+Delay_1                           00000024
+Delay_2                           00000025
+Delay_Long                        00000084
+Delay_Motor_Safe                  000000D6
+Delay_Short                       0000007F
+Desired_Curtain                   00000026
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 15
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+Fix_100                           00000104
+Force_Close                       00000037
+GCEN                              00000007
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+GO_NOT_DONE                       00000002
+I2C_DATA                          00000005
+I2C_READ                          00000002
+I2C_START                         00000003
+I2C_STOP                          00000004
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+ISR_Routine                       00000005
+In_Loop                           000000DA
+LCD_Draw_Interface                00000047
+LCD_Init                          0000003D
+LCD_Update_Values                 00000062
+LDR_THRESHOLD                     00000096
+Light_Value                       0000002D
+Loop_CCW                          000000BB
+Loop_CW                           000000B5
+Loop_L                            00000086
+Loop_S                            00000081
+MainLoop                          00000030
+Math_Temp_H                       00000022
+Math_Temp_L                       00000023
+Motor_Manager                     000000A7
+Motor_Manager_Call                0000003A
+Move_Close                        000000B0
+Move_Open                         000000AD
+NOT_A                             00000005
+NOT_ADDRESS                       00000005
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+NOT_W                             00000002
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 16
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+NOT_WRITE                         00000002
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+Out_Loop                          000000D8
+P                                 00000004
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PEN                               00000002
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+Pot_Value                         0000002E
+R                                 00000002
+RA0                               00000000
+RA1                               00000001
+RA2                               00000002
+RA3                               00000003
+RA4                               00000004
+RA5                               00000005
+RB0                               00000000
+RB1                               00000001
+RB2                               00000002
+RB3                               00000003
+RB4                               00000004
+RB5                               00000005
+RB6                               00000006
+RB7                               00000007
+RBIE                              00000003
+RBIF                              00000000
+RC0                               00000000
+RC1                               00000001
+RC2                               00000002
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 17
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RC3                               00000003
+RC4                               00000004
+RC5                               00000005
+RC6                               00000006
+RC7                               00000007
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCEN                              00000003
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RD0                               00000000
+RD1                               00000001
+RD2                               00000002
+RD3                               00000003
+RD4                               00000004
+RD5                               00000005
+RD6                               00000006
+RD7                               00000007
+RE0                               00000000
+RE1                               00000001
+RE2                               00000002
+READ_WRITE                        00000002
+RP0                               00000005
+RP1                               00000006
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_NOT_W                           00000002
+R_W                               00000002
+Read_LDR                          000000DF
+Read_Pot                          000000EE
+S                                 00000003
+SEN                               00000000
+SMP                               00000007
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+SSPADD                            00000093
+SSPBUF                            00000013
+SSPCON                            00000014
+SSPCON2                           00000091
+SSPEN                             00000005
+SSPIE                             00000003
+SSPIF                             00000003
+SSPM0                             00000000
+SSPM1                             00000001
+SSPM2                             00000002
+SSPM3                             00000003
+SSPOV                             00000006
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 18
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+SSPSTAT                           00000094
+STATUS                            00000003
+STEPS_PER_PERCENT                 0000000A
+SYNC                              00000004
+Send_Cmd                          0000006D
+Send_Data                         00000076
+Send_Desired                      00000135
+Send_Light                        00000138
+Send_Zero                         00000132
+Step_10_Times_CCW                 000000B9
+Step_10_Times_CW                  000000B3
+Step_One_CCW                      000000C5
+Step_One_CW                       000000BF
+Step_Phase                        0000002C
+Step_Table                        000000D1
+Store_High_Bits                   0000013F
+Store_Low_Bits                    0000013B
+System_Init                       00000011
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR1                              0000000E
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISA0                            00000000
+TRISA1                            00000001
+TRISA2                            00000002
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 19
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TRISA3                            00000003
+TRISA4                            00000004
+TRISA5                            00000005
+TRISB                             00000086
+TRISB0                            00000000
+TRISB1                            00000001
+TRISB2                            00000002
+TRISB3                            00000003
+TRISB4                            00000004
+TRISB5                            00000005
+TRISB6                            00000006
+TRISB7                            00000007
+TRISC                             00000087
+TRISC0                            00000000
+TRISC1                            00000001
+TRISC2                            00000002
+TRISC3                            00000003
+TRISC4                            00000004
+TRISC5                            00000005
+TRISC6                            00000006
+TRISC7                            00000007
+TRISD                             00000088
+TRISD0                            00000000
+TRISD1                            00000001
+TRISD2                            00000002
+TRISD3                            00000003
+TRISD4                            00000004
+TRISD5                            00000005
+TRISD6                            00000006
+TRISD7                            00000007
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+Target_Steps_H                    00000028
+Target_Steps_L                    00000029
+Tx_Wait                           00000145
+UA                                00000001
+UART_Init                         0000010C
+UART_Receive_Handler              00000117
+UART_Rx_Temp                      0000002F
+UART_Tx                           00000143
+W                                 00000000
+MPASM 5.86                          MAIN.ASM   12-27-2025  16:14:43         PAGE 20
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+WCOL                              00000007
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Wait_LDR_Done                     000000E5
+Wait_Pot_Done                     000000F4
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_BOREN_OFF                        00003FBF
+_BOREN_ON                         00003FFF
+_CONFIG                           00002007
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00001FFF
+_CP_OFF                           00003FFF
+_CP_ON                            00001FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_DEVID1                           00002006
+_FOSC_EXTRC                       00003FFF
+_FOSC_HS                          00003FFE
+_FOSC_LP                          00003FFC
+_FOSC_XT                          00003FFD
+_HS_OSC                           00003FFE
+_IDLOC0                           00002000
+_IDLOC1                           00002001
+_IDLOC2                           00002002
+_IDLOC3                           00002003
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDTE_OFF                         00003FFB
+_WDTE_ON                          00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_1FOURTH                      00003BFF
+_WRT_256                          00003DFF
+_WRT_HALF                         000039FF
+_WRT_OFF                          00003FFF
+_XT_OSC                           00003FFD
+__16F877A                         00000001
+status_temp                       00000021
+w_temp                            00000020
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :    11 reported,     0 suppressed
+
+

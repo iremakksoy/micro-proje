@@ -1,0 +1,226 @@
+MPLINK 5.08, LINKER
+Linker Map File - Created Sat Dec 27 12:45:40 2025
+
+                                 Section Info
+                  Section       Type    Address   Location Size(Bytes)
+                ---------  ---------  ---------  ---------  ---------
+                   .org_0       code   0x000000    program   0x000002
+                   .cinit    romdata   0x000001    program   0x000004
+                   .org_1       code   0x000004    program   0x000962
+.config_2007_BUILD/DEFAULT/PRODUCTION/MAIN.O       code   0x002007    program   0x000002
+
+
+
+                              Program Memory Usage 
+                               Start         End      
+                           ---------   ---------      
+                            0x000000    0x000002      
+                            0x000004    0x0004b4      
+                            0x002007    0x002007      
+            1205 out of 8454 program addresses used, program memory utilization is 14%
+
+
+
+                              Symbols - Sorted by Name
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+                  B2_DONE   0x0003bf    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                  B2_LOOP   0x0003b7    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                  B3_DONE   0x0003d5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     B3_H   0x0003c5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     B3_T   0x0003cd    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                BUILD_AMB   0x000363    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                BUILD_DES   0x000361    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                BUILD_FAN   0x000365    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+             BinTo2Digits   0x0003b5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+             BinTo3Digits   0x0003c2    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                 BuildFan   0x00039d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+         BuildTempAmbient   0x000382    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+         BuildTempDesired   0x000367    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB0   0x00031a    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB1   0x00031e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB2   0x000322    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB3   0x000326    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+               DigitToSeg   0x0003d8    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+      Display_EnableDigit   0x00032a    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+          Display_GetByte   0x00030d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+          Display_Rebuild   0x000347    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+          Display_Service   0x0002f3    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED0   0x000337    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED1   0x00033b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED2   0x00033f    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED3   0x000343    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ISR   0x000004    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                     Init   0x00001a    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+              Keypad_Poll   0x000165    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+           Keypad_Process   0x000231    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+            Keypad_RB_ISR   0x00015e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+              Keypad_Scan   0x000186    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 MainLoop   0x000061    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                 NO_ERROR   0x000357    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+       Temp_ControlUpdate   0x00013d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+         Temp_ReadAmbient   0x0000bb    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+            Temp_TMR1_ISR   0x000080    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+         Temp_TMR1_Reload   0x000079    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+              UART_ACCEPT   0x00047c    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_CHECK50X   0x000471    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_CLR_OERR   0x00041d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_INVALID   0x00048c    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+                UART_Init   0x000403    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+         UART_ProcessByte   0x000422    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_SET_FRAC   0x000442    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_SET_INT   0x00044d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_SendByte   0x000494    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_Service   0x000410    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+          UART_TRY_COMMIT   0x000458    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_AMB_FR   0x0004a6    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_AMB_IN   0x0004ab    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_DES_FR   0x00049c    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_DES_IN   0x0004a1    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+              UART_TX_FAN   0x0004b0    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_TX_WAIT   0x000494    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+                 _ADD_ACC   0x00012e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+         _AsciiDigitToBin   0x00029b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+    _CommitDesiredIfValid   0x0002ae    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _KeyMap   0x0001ed    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 _ReadRow   0x0001be    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 _RowMul4   0x0001e4    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                     _acq   0x0000bf    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+               _bad_digit   0x0002ac    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c0   0x0001a1    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c1   0x0001a5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c2   0x0001aa    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c3   0x0001af    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+              _desired_gt   0x000154    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+              _desired_lt   0x000159    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                  _digit1   0x00025b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _digit2   0x000269    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                   _div10   0x000108    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                _div_done   0x000120    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+             _expect_hash   0x000290    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+             _expect_star   0x000277    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                    _frac   0x000282    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+               _frac_diff   0x000151    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                    _ge10   0x000113    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                _int_diff   0x00014e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+               _kp_accept   0x0002d5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+              _kp_invalid   0x0002eb    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _kp_rel   0x000182    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 _mode_ok   0x0000b3    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                  _no_adc   0x000072    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                 _no_disp   0x000078    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+              _no_err_dec   0x00009e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                  _no_key   0x00006b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                 _pressed   0x0001e1    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _r0   0x0001d4    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _r1   0x0001d8    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _r2   0x0001dd    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+               _scan_done   0x0001b4    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                _sec_done   0x0000b6    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                     _sh7   0x0000fb    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+             _start_entry   0x000251    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                _wait_adc   0x0000c5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+
+
+
+                              Symbols - Sorted by Address
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+                      ISR   0x000004    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                     Init   0x00001a    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                 MainLoop   0x000061    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                  _no_key   0x00006b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                  _no_adc   0x000072    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+                 _no_disp   0x000078    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\main.asm
+         Temp_TMR1_Reload   0x000079    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+            Temp_TMR1_ISR   0x000080    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+              _no_err_dec   0x00009e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                 _mode_ok   0x0000b3    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                _sec_done   0x0000b6    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+         Temp_ReadAmbient   0x0000bb    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                     _acq   0x0000bf    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                _wait_adc   0x0000c5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                     _sh7   0x0000fb    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                   _div10   0x000108    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                    _ge10   0x000113    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                _div_done   0x000120    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                 _ADD_ACC   0x00012e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+       Temp_ControlUpdate   0x00013d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+                _int_diff   0x00014e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+               _frac_diff   0x000151    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+              _desired_gt   0x000154    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+              _desired_lt   0x000159    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\tempctrl.asm
+            Keypad_RB_ISR   0x00015e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+              Keypad_Poll   0x000165    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _kp_rel   0x000182    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+              Keypad_Scan   0x000186    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c0   0x0001a1    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c1   0x0001a5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c2   0x0001aa    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _c3   0x0001af    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+               _scan_done   0x0001b4    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 _ReadRow   0x0001be    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _r0   0x0001d4    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _r1   0x0001d8    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                      _r2   0x0001dd    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 _pressed   0x0001e1    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                 _RowMul4   0x0001e4    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _KeyMap   0x0001ed    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+           Keypad_Process   0x000231    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+             _start_entry   0x000251    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _digit1   0x00025b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                  _digit2   0x000269    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+             _expect_star   0x000277    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+                    _frac   0x000282    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+             _expect_hash   0x000290    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+         _AsciiDigitToBin   0x00029b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+               _bad_digit   0x0002ac    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+    _CommitDesiredIfValid   0x0002ae    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+               _kp_accept   0x0002d5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+              _kp_invalid   0x0002eb    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\keypad.asm
+          Display_Service   0x0002f3    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+          Display_GetByte   0x00030d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB0   0x00031a    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB1   0x00031e    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB2   0x000322    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     DGB3   0x000326    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+      Display_EnableDigit   0x00032a    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED0   0x000337    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED1   0x00033b    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED2   0x00033f    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                      ED3   0x000343    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+          Display_Rebuild   0x000347    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                 NO_ERROR   0x000357    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                BUILD_DES   0x000361    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                BUILD_AMB   0x000363    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                BUILD_FAN   0x000365    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+         BuildTempDesired   0x000367    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+         BuildTempAmbient   0x000382    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                 BuildFan   0x00039d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+             BinTo2Digits   0x0003b5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                  B2_LOOP   0x0003b7    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                  B2_DONE   0x0003bf    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+             BinTo3Digits   0x0003c2    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     B3_H   0x0003c5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                     B3_T   0x0003cd    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                  B3_DONE   0x0003d5    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+               DigitToSeg   0x0003d8    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\display.asm
+                UART_Init   0x000403    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_Service   0x000410    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_CLR_OERR   0x00041d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+         UART_ProcessByte   0x000422    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_SET_FRAC   0x000442    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_SET_INT   0x00044d    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+          UART_TRY_COMMIT   0x000458    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_CHECK50X   0x000471    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+              UART_ACCEPT   0x00047c    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_INVALID   0x00048c    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+            UART_SendByte   0x000494    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+             UART_TX_WAIT   0x000494    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_DES_FR   0x00049c    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_DES_IN   0x0004a1    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_AMB_FR   0x0004a6    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+           UART_TX_AMB_IN   0x0004ab    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+              UART_TX_FAN   0x0004b0    program     static C:\Users\deniz\OneDrive\Desktop\Ders\Micro\Board1.X\uart.asm
+
+

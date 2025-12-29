@@ -1,0 +1,132 @@
+MPLINK 5.09, LINKER
+Linker Map File - Created Sat Dec 27 16:14:44 2025
+
+                                 Section Info
+                  Section       Type    Address   Location Size(Bytes)
+                ---------  ---------  ---------  ---------  ---------
+                   .org_0       code   0x000000    program   0x000002
+                   .cinit    romdata   0x000001    program   0x000004
+                   .org_1       code   0x000004    program   0x00028e
+.config_2007_BUILD/DEFAULT/PRODUCTION/MAIN.O       code   0x002007    program   0x000002
+
+
+
+                              Program Memory Usage 
+                               Start         End      
+                           ---------   ---------      
+                            0x000000    0x000002      
+                            0x000004    0x00014a      
+                            0x002007    0x002007      
+            331 out of 8454 program addresses used, program memory utilization is 3%
+
+
+
+                              Symbols - Sorted by Name
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+                 ADC_Loop   0x000109    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+            ADC_Safe_Wait   0x000107    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+           Activate_Coils   0x0000cb    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                 BinToDec   0x000089    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                   Calc_1   0x00009b    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                  Calc_10   0x000094    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 Calc_100   0x00008d    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+            Control_Motor   0x00003a    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+               Delay_Long   0x000084    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+         Delay_Motor_Safe   0x0000d6    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+              Delay_Short   0x00007f    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                  Fix_100   0x000104    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+              Force_Close   0x000037    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+              ISR_Routine   0x000005    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+                  In_Loop   0x0000da    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+       LCD_Draw_Interface   0x000047    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 LCD_Init   0x00003d    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+        LCD_Update_Values   0x000062    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 Loop_CCW   0x0000bb    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                  Loop_CW   0x0000b5    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                   Loop_L   0x000086    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                   Loop_S   0x000081    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 MainLoop   0x000030    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+            Motor_Manager   0x0000a7    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+       Motor_Manager_Call   0x00003a    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+               Move_Close   0x0000b0    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                Move_Open   0x0000ad    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                 Out_Loop   0x0000d8    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                 Read_LDR   0x0000df    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+                 Read_Pot   0x0000ee    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+                 Send_Cmd   0x00006d    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                Send_Data   0x000076    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+             Send_Desired   0x000135    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+               Send_Light   0x000138    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+                Send_Zero   0x000132    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+        Step_10_Times_CCW   0x0000b9    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+         Step_10_Times_CW   0x0000b3    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+             Step_One_CCW   0x0000c5    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+              Step_One_CW   0x0000bf    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+               Step_Table   0x0000d1    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+          Store_High_Bits   0x00013f    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+           Store_Low_Bits   0x00013b    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+              System_Init   0x000011    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+                  Tx_Wait   0x000145    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+                UART_Init   0x00010c    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+     UART_Receive_Handler   0x000117    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+                  UART_Tx   0x000143    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+            Wait_LDR_Done   0x0000e5    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+            Wait_Pot_Done   0x0000f4    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+
+
+
+                              Symbols - Sorted by Address
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+              ISR_Routine   0x000005    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+              System_Init   0x000011    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+                 MainLoop   0x000030    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+              Force_Close   0x000037    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+       Motor_Manager_Call   0x00003a    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+            Control_Motor   0x00003a    program     static C:\Users\mertk\MPLABXProjects\board2.X\main.asm
+                 LCD_Init   0x00003d    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+       LCD_Draw_Interface   0x000047    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+        LCD_Update_Values   0x000062    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 Send_Cmd   0x00006d    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                Send_Data   0x000076    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+              Delay_Short   0x00007f    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                   Loop_S   0x000081    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+               Delay_Long   0x000084    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                   Loop_L   0x000086    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 BinToDec   0x000089    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                 Calc_100   0x00008d    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                  Calc_10   0x000094    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+                   Calc_1   0x00009b    program     static C:\Users\mertk\MPLABXProjects\board2.X\lcd_module.asm
+            Motor_Manager   0x0000a7    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                Move_Open   0x0000ad    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+               Move_Close   0x0000b0    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+         Step_10_Times_CW   0x0000b3    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                  Loop_CW   0x0000b5    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+        Step_10_Times_CCW   0x0000b9    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                 Loop_CCW   0x0000bb    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+              Step_One_CW   0x0000bf    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+             Step_One_CCW   0x0000c5    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+           Activate_Coils   0x0000cb    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+               Step_Table   0x0000d1    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+         Delay_Motor_Safe   0x0000d6    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                 Out_Loop   0x0000d8    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                  In_Loop   0x0000da    program     static C:\Users\mertk\MPLABXProjects\board2.X\stepmotor.asm
+                 Read_LDR   0x0000df    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+            Wait_LDR_Done   0x0000e5    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+                 Read_Pot   0x0000ee    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+            Wait_Pot_Done   0x0000f4    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+                  Fix_100   0x000104    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+            ADC_Safe_Wait   0x000107    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+                 ADC_Loop   0x000109    program     static C:\Users\mertk\MPLABXProjects\board2.X\sensors.asm
+                UART_Init   0x00010c    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+     UART_Receive_Handler   0x000117    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+                Send_Zero   0x000132    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+             Send_Desired   0x000135    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+               Send_Light   0x000138    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+           Store_Low_Bits   0x00013b    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+          Store_High_Bits   0x00013f    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+                  UART_Tx   0x000143    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+                  Tx_Wait   0x000145    program     static C:\Users\mertk\MPLABXProjects\board2.X\uart.asm
+
+
