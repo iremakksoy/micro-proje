@@ -1,0 +1,7 @@
+{
+  "port_board1": "COM3",
+  "port_board2": "COM4",
+  "baudrate": 9600,
+  "refresh_interval_ms": 500,
+  "use_mock": false
+}
