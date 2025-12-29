@@ -1,0 +1,293 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\ozcob\\Downloads\\MicroProje\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_board2.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:uart_tools\\uart_board2.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_monitor.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:uart_tools\\uart_monitor.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_board1.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:uart_tools\\uart_board1.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:uart_tools\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\test_board2.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:tests\\test_board2.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\test_board1.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:tests\\test_board1.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\simple_port_test.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:tests\\simple_port_test.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\app\\main_menu.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:app\\main_menu.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:tests\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\curtain_control.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:api\\curtain_control.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\requirements.txt||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:requirements.txt||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\app\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:app\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\air_conditioner.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:api\\air_conditioner.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\home_automation.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:api\\home_automation.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:api\\__init__.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\README.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:README.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|C:\\Users\\ozcob\\Downloads\\MicroProje\\MicroProje.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{3FA4F7D8-89B7-4A7F-AB99-C75871C865C1}|MicroProje.pyproj|solutionrelative:MicroProje.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "uart_monitor.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_monitor.py",
+              "RelativeDocumentMoniker": "uart_tools\\uart_monitor.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_monitor.py",
+              "RelativeToolTip": "uart_tools\\uart_monitor.py",
+              "ViewState": "AgIAAIEAAAAAAAAAAAAAwIYAAAAdAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-14T10:49:16.809Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "uart_board2.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_board2.py",
+              "RelativeDocumentMoniker": "uart_tools\\uart_board2.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_board2.py",
+              "RelativeToolTip": "uart_tools\\uart_board2.py",
+              "ViewState": "AgIAAOcAAAAAAAAAAADwv/IAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-14T10:49:04.52Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "uart_board1.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_board1.py",
+              "RelativeDocumentMoniker": "uart_tools\\uart_board1.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\uart_board1.py",
+              "RelativeToolTip": "uart_tools\\uart_board1.py",
+              "ViewState": "AgIAAAABAAAAAAAAAADwvxYBAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-14T10:48:54.185Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "__init__.py (uart_tools)",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\__init__.py",
+              "RelativeDocumentMoniker": "uart_tools\\__init__.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\uart_tools\\__init__.py",
+              "RelativeToolTip": "uart_tools\\__init__.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAADAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-14T10:48:39.283Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "simple_port_test.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\simple_port_test.py",
+              "RelativeDocumentMoniker": "tests\\simple_port_test.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\simple_port_test.py",
+              "RelativeToolTip": "tests\\simple_port_test.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAhAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-13T20:43:30.037Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "main_menu.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\app\\main_menu.py",
+              "RelativeDocumentMoniker": "app\\main_menu.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\app\\main_menu.py",
+              "RelativeToolTip": "app\\main_menu.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:27:53.36Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "__init__.py (app)",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\app\\__init__.py",
+              "RelativeDocumentMoniker": "app\\__init__.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\app\\__init__.py",
+              "RelativeToolTip": "app\\__init__.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:27:36.137Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "test_board2.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\test_board2.py",
+              "RelativeDocumentMoniker": "tests\\test_board2.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\test_board2.py",
+              "RelativeToolTip": "tests\\test_board2.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:27:17.183Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "test_board1.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\test_board1.py",
+              "RelativeDocumentMoniker": "tests\\test_board1.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\test_board1.py",
+              "RelativeToolTip": "tests\\test_board1.py",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAAACkAAAAYAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:27:07.239Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "__init__.py (tests)",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\__init__.py",
+              "RelativeDocumentMoniker": "tests\\__init__.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\tests\\__init__.py",
+              "RelativeToolTip": "tests\\__init__.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:26:51.4Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "curtain_control.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\curtain_control.py",
+              "RelativeDocumentMoniker": "api\\curtain_control.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\curtain_control.py",
+              "RelativeToolTip": "api\\curtain_control.py",
+              "ViewState": "AgIAAAUBAAAAAAAAAADwvxMBAAAgAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:26:36.748Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "air_conditioner.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\air_conditioner.py",
+              "RelativeDocumentMoniker": "api\\air_conditioner.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\air_conditioner.py",
+              "RelativeToolTip": "api\\air_conditioner.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:26:22.321Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "requirements.txt",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\requirements.txt",
+              "RelativeDocumentMoniker": "requirements.txt",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\requirements.txt",
+              "RelativeToolTip": "requirements.txt",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003109|",
+              "WhenOpened": "2025-12-11T17:24:42.634Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "home_automation.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\home_automation.py",
+              "RelativeDocumentMoniker": "api\\home_automation.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\home_automation.py",
+              "RelativeToolTip": "api\\home_automation.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:26:05.504Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "__init__.py (api)",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\__init__.py",
+              "RelativeDocumentMoniker": "api\\__init__.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\api\\__init__.py",
+              "RelativeToolTip": "api\\__init__.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:25:47.456Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "README.md",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\README.md",
+              "RelativeDocumentMoniker": "README.md",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\README.md",
+              "RelativeToolTip": "README.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2025-12-11T17:25:13.017Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "MicroProje.py",
+              "DocumentMoniker": "C:\\Users\\ozcob\\Downloads\\MicroProje\\MicroProje.py",
+              "RelativeDocumentMoniker": "MicroProje.py",
+              "ToolTip": "C:\\Users\\ozcob\\Downloads\\MicroProje\\MicroProje.py",
+              "RelativeToolTip": "MicroProje.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
+              "WhenOpened": "2025-12-11T17:20:28.095Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
