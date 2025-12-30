@@ -1,0 +1,17 @@
+Warning[205] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\COMMON.INC 17 : Found directive in column 1. (IFNDEF)
+Warning[205] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 40 : Found directive in column 1. (ORG)
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 83 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 87 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 91 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 94 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 97 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 102 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 113 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\MAIN.ASM 132 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Warning[205] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\COMMON.INC 122 : Found directive in column 1. (IFNDEF)
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\TEMPCTRL.ASM 138 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Warning[205] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\COMMON.INC 227 : Found directive in column 1. (IFNDEF)
+Warning[205] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\COMMON.INC 332 : Found directive in column 1. (IFNDEF)
+Warning[205] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\COMMON.INC 437 : Found directive in column 1. (IFNDEF)
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\UART.ASM 10 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\DENIZ\ONEDRIVE\DESKTOP\BOARD1.X\UART.ASM 14 : Register in operand not in bank 0.  Ensure that bank bits are correct.

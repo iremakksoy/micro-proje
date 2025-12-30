@@ -1,0 +1,3019 @@
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;============================================================
+                      00002 ; main.asm
+                      00003 ; Target  : PIC16F877A  (HS OSC varsayimi)
+                      00004 ; Fosc    : 4MHz kabul edilerek Timer1 preload hesaplari yapildi
+                      00005 ;
+                      00006 ; I/O Haritasi:
+                      00007 ;  RA0/AN0  : LM35 analog giris
+                      00008 ;  RA4/T0CKI: Fan tach/pulse girisi (TMR0 external counter)
+                      00009 ;  RB0..RB3 : Keypad kolon (output)
+                      00010 ;  RB4..RB7 : Keypad satir (input + pullup)
+                      00011 ;  RC0..RC3 : 7-seg digit enable (multiplex)
+                      00012 ;  RD0..RD7 : 7-seg segment hatlari (a..g,dp)
+                      00013 ;  RC6/TX   : UART TX
+                      00014 ;  RC7/RX   : UART RX
+                      00015 ;  RE0      : Heater output
+                      00016 ;  RE1      : Cooler output
+                      00017 ;
+                      00018 ; Yazilim Mimarisi:
+                      00019 ;  - ISR sadece Timer1 (100ms) ve opsiyonel RBIF servisler
+                      00020 ;  - MainLoop: Display_Service + UART_Service + Keypad_Poll
+                      00021 ;              + flag'lere gore ADC okuma / display rebuild
+                      00022 ;============================================================
+                      00023 
+                      00024         LIST    P=16F877A
+                      00025         #include <P16F877A.INC>
+                      00001         LIST
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ; Build date : Nov 22 2017
+                      00005 ;  MPASM PIC16F877A processor include
+                      00006 ; 
+                      00007 ;  (c) Copyright 1999-2017 Microchip Technology, All rights reserved
+                      00008 ;==========================================================================
+                      00009 
+                      00567         LIST
+                      00026         #include "common.inc"
+                      00001 ;============================================================
+                      00002 ; common.inc
+                      00003 ; Target  : PIC16F877A
+                      00004 ; Project : Temperature System (Term Project)
+                      00005 ;
+                      00006 ; Bu dosya:
+                      00007 ;  - Konfig bitlerini (tek yerde) tanimlar
+                      00008 ;  - Tum moduller icin ortak sabitleri (MODE_*, NO_KEY, vb.)
+                      00009 ;  - sys_flags bit anlamlarini
+                      00010 ;  - RAM'deki global degiskenleri (CBLOCK 0x20) toplar
+                      00011 ;
+                      00012 ; Not:
+                      00013 ;  - CBLOCK degiskenleri tum .asm modullerinde ortak kullanilir.
+                      00014 ;  - BANKSEL kullanimi ile dogru bank secimi kritik.
+                      00015 ;============================================================
+                      00016 
+Warning[205]: Found directive in column 1. (IFNDEF)
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00017 IFNDEF COMMON_INC_LOADED
+                      00018 COMMON_INC_LOADED   EQU     1
+                      00019 
+                      00020         LIST    P=16F877A
+                      00021         #include <P16F877A.INC>
+                      00022 
+                      00023 ;------------ Config (SADECE 1 KERE) ------------
+                      00024         __CONFIG _WDT_OFF & _PWRTE_ON & _CP_OFF & _LVP_OFF & _BODEN_OFF & _HS_OSC
+                      00025 
+                      00026 ;------------ Constants ------------
+                      00027 MODE_DESIRED    EQU     0
+                      00028 MODE_AMBIENT    EQU     1
+                      00029 MODE_FAN        EQU     2
+                      00030 
+                      00031 NO_KEY          EQU     0xFF
+                      00032 
+                      00033 ; sys_flags bitleri (bit=1 iken isaretli/durum aktif):
+                      00034 F_DO_ADC        EQU     0 ; F_DO_ADC      : 1 saniyelik zamanlayici ADC okumasi istiyor (main loop okur)
+                      00035 F_DISP_DIRTY    EQU     1 ; F_DISP_DIRTY  : Ekran icerigi degisti -> Display_Rebuild cagirilacak
+                      00036 F_UART_GOT_FR   EQU     2 ; F_UART_GOT_FR : UART tarafindan yeni fraction (ondalik) geldi
+                      00037 F_UART_GOT_IN   EQU     3 ; F_UART_GOT_IN : UART tarafindan yeni integer geldi
+                      00038    
+                      00039 ; keypad entry_state
+                      00040 ENT_IDLE        EQU     0
+                      00041 ENT_D1          EQU     1
+                      00042 ENT_D2          EQU     2
+                      00043 ENT_STAR        EQU     3
+                      00044 ENT_FRAC        EQU     4
+                      00045 ENT_HASH        EQU     5
+                      00046 
+                      00047 ;------------ RAM ------------
+                      00048         CBLOCK  0x20
+                      00049 W_TEMP
+                      00050 STATUS_TEMP
+                      00051 PCLATH_TEMP
+                      00052 
+                      00053 desired_int
+                      00054 desired_frac
+                      00055 ambient_int
+                      00056 ambient_frac
+                      00057 fan_rps
+                      00058 ; desired_int/frac  : kullanici hedefi (xx.x)
+                      00059 ; ambient_int/frac  : LM35'ten okunan ortam (xx.x)
+                      00060 ; fan_rps           : 1 saniyede TMR0 sayimi (yaklasik rps)
+                      00061 
+                      00062 tick100ms
+                      00063 sec_counter
+                      00064 disp_mode
+                      00065 error_timer
+                      00066 sys_flags
+                      00067 ; tick100ms   : Timer1 ile 100ms sayaci (0..9)
+                      00068 ; sec_counter : display mode rotasyonu icin (2 saniyede bir)
+                      00069 ; disp_mode   : 0=desired,1=ambient,2=fan
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00070 ; error_timer : 0 degilse Display "EROR"
+                      00071 ; sys_flags   : bayraklar
+                      00072 
+                      00073 disp_idx
+                      00074 disp0
+                      00075 disp1
+                      00076 disp2
+                      00077 disp3
+                      00078 ; disp_idx : multiplex sira (0..3)
+                      00079 ; disp0..3 : RD portuna basilan segment pattern'leri
+                      00080 
+                      00081 key_last
+                      00082 key_ready
+                      00083 key_lock
+                      00084 entry_state
+                      00085 in_d1
+                      00086 in_d2
+                      00087 in_frac
+                      00088 ; key_last   : son kabul edilen tus (ASCII)
+                      00089 ; key_ready  : 1 ise main loop Keypad_Process yapar
+                      00090 ; key_lock   : debounce (1 tus/press)
+                      00091 ; entry_state: A XX*X# state machine
+                      00092 ; in_d1/in_d2/in_frac : girilen rakamlar (binary 0..9)
+                      00093 
+                      00094 uart_new_int
+                      00095 uart_new_frac
+                      00096 ; uart_new_int/frac : UART'tan gelen yeni hedef deger (xx.x)
+                      00097 ; tmp0..tmp3        : ortak scratch register'lar
+                      00098 
+                      00099 tmp0
+                      00100 tmp1
+                      00101 tmp2
+                      00102 tmp3
+                      00103         ENDC
+                      00104 
+                      00105 ENDIF
+                      00027 
+                      00028         ORG     0x0000
+0000   2???           00029         GOTO    Init
+                      00030 
+                      00031         
+                      00032 ;------------------------------------------------------------
+                      00033 ; ISR (0x0004)
+                      00034 ; - W/STATUS/PCLATH context save/restore yapilir
+                      00035 ; - TMR1IF: Temp_TMR1_ISR (100ms tick -> 1s olaylari)
+                      00036 ; - RBIF : Keypad_RB_ISR (RB port mismatch temizleme)
+                      00037 ; Not: ISR icinde uzun is yapmiyoruz; ana is main loop'a flag ile aktarilir.
+                      00038 ;------------------------------------------------------------
+                      00039 
+Warning[205]: Found directive in column 1. (ORG)
+                      00040 ORG     0x0004
+0004                  00041 ISR:
+0004   00A0           00042         MOVWF   W_TEMP
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0005   0E03           00043         SWAPF   STATUS, W
+0006   00A1           00044         MOVWF   STATUS_TEMP
+0007   080A           00045         MOVF    PCLATH, W
+0008   00A2           00046         MOVWF   PCLATH_TEMP
+                      00047 
+                      00048         ; --- FORCE BANK0 for correct SFR access (PIR1/INTCON etc.) ---
+0009   1283           00049         BCF     STATUS, RP0
+000A   1303           00050         BCF     STATUS, RP1
+                      00051 
+                      00052         ; Timer1 interrupt?
+000B   1283 1303      00053         BANKSEL PIR1
+000D   180C           00054         BTFSC   PIR1, TMR1IF
+000E   2???           00055         CALL    Temp_TMR1_ISR
+                      00056 
+                      00057         ; PORTB change interrupt (optional)
+000F   1283 1303      00058         BANKSEL INTCON
+0011   180B           00059         BTFSC   INTCON, RBIF
+0012   2???           00060         CALL    Keypad_RB_ISR
+                      00061 
+0013   0822           00062         MOVF    PCLATH_TEMP, W
+0014   008A           00063         MOVWF   PCLATH
+0015   0E21           00064         SWAPF   STATUS_TEMP, W
+0016   0083           00065         MOVWF   STATUS
+0017   0EA0           00066         SWAPF   W_TEMP, F
+0018   0E20           00067         SWAPF   W_TEMP, W
+0019   0009           00068         RETFIE
+                      00069 
+                      00070 ;------------------------------------------------------------
+001A                  00071 Init:
+                      00072         ; --- Ports default ---
+001A   1283 1303      00073         BANKSEL PORTA
+001C   0185           00074         CLRF    PORTA
+001D   0186           00075         CLRF    PORTB
+001E   0187           00076         CLRF    PORTC
+001F   0188           00077         CLRF    PORTD
+0020   0189           00078         CLRF    PORTE
+                      00079 
+                      00080         ; RA0=AN0 input, RA4=T0CKI input
+0021   1683 1303      00081         BANKSEL TRISA
+0023   3011           00082         MOVLW   b'00010001'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0024   0085           00083         MOVWF   TRISA
+                      00084 
+                      00085         ; Keypad: RB7..RB4 input, RB3..RB0 output
+0025   30F0           00086         MOVLW   b'11110000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0026   0086           00087         MOVWF   TRISB
+                      00088 
+                      00089         ; 7seg digits on RC0..RC3 output, UART RX on RC7 input
+0027   3080           00090         MOVLW   b'10000000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0028   0087           00091         MOVWF   TRISC
+                      00092 
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00093         ; 7seg segments on PORTD output
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0029   0188           00094         CLRF    TRISD
+                      00095 
+                      00096         ; Heater/Cooler on RE0/RE1 output
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+002A   0189           00097         CLRF    TRISE
+                      00098 
+                      00099         ; ADC: sadece AN0 analog, geri kalan dijital (RE0/RE1 dijital kalmal?!)
+002B   1683 1303      00100         BANKSEL ADCON1
+002D   308E           00101         MOVLW   0x8E        ; ADFM=1, PCFG=1110 -> AN0 analog, Vref=Vdd/Vss
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+002E   009F           00102         MOVWF   ADCON1
+                      00103 
+                      00104         ; ADC clock: FRC (simde en sorunsuz)
+002F   1283 1303      00105         BANKSEL ADCON0
+0031   30C1           00106         MOVLW   0xC1        ; ADCS=11 (FRC), CH0, ADON=1
+0032   009F           00107         MOVWF   ADCON0
+                      00108 
+                      00109 
+                      00110         ; OPTION_REG: enable RB pullups, TMR0 external on RA4, no prescaler
+0033   1683 1303      00111         BANKSEL OPTION_REG
+0035   3068           00112         MOVLW   0x68        ; RBPU=0 INTEDG=1 T0CS=1 T0SE=0 PSA=1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0036   0081           00113         MOVWF   OPTION_REG
+                      00114 
+                      00115         ; --- Keypad idle: columns LOW (RB0..RB3=0) + mismatch clear ---
+0037   1283 1303      00116         BANKSEL PORTB
+0039   0186           00117         CLRF    PORTB
+003A   0806           00118         MOVF    PORTB, W            ; clear mismatch
+                      00119 
+                      00120         ; Timer1: internal clock, presc 1:8, enable
+003B   1283 1303      00121         BANKSEL T1CON
+003D   3031           00122         MOVLW   0x31
+003E   0090           00123         MOVWF   T1CON
+                      00124 
+                      00125         ; preload TMR1 for 100ms @ Fosc=4MHz, presc=8 => 0xCF2C
+003F   2???           00126         CALL    Temp_TMR1_Reload
+                      00127 
+                      00128         ; enable Timer1 interrupt
+0040   1283 1303      00129         BANKSEL PIR1
+0042   100C           00130         BCF     PIR1, TMR1IF
+0043   1683 1303      00131         BANKSEL PIE1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0045   140C           00132         BSF     PIE1, TMR1IE
+                      00133 
+                      00134         ; keypad: we POLL in main loop -> RBIE OFF
+0046   1283 1303      00135         BANKSEL INTCON
+0048   100B           00136         BCF     INTCON, RBIF
+0049   118B           00137         BCF     INTCON, RBIE
+004A   170B           00138         BSF     INTCON, PEIE
+004B   178B           00139         BSF     INTCON, GIE
+                      00140 
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00141         ; init variables
+004C   1283 1303      00142         BANKSEL desired_int
+004E   3019           00143         MOVLW   .25
+004F   00A3           00144         MOVWF   desired_int
+0050   01A4           00145         CLRF    desired_frac
+                      00146 
+0051   01A5           00147         CLRF    ambient_int
+0052   01A6           00148         CLRF    ambient_frac
+0053   01A7           00149         CLRF    fan_rps
+                      00150 
+0054   01A8           00151         CLRF    tick100ms
+0055   01A9           00152         CLRF    sec_counter
+0056   01AC           00153         CLRF    sys_flags
+                      00154 
+0057   3000           00155         MOVLW   MODE_DESIRED
+0058   00AA           00156         MOVWF   disp_mode
+0059   01AD           00157         CLRF    disp_idx
+005A   01AB           00158         CLRF    error_timer
+                      00159 
+005B   01B3           00160         CLRF    key_ready
+005C   01B4           00161         CLRF    key_lock
+005D   01B5           00162         CLRF    entry_state
+                      00163 
+                      00164         ; init modules
+005E   2???           00165         CALL    Display_Rebuild
+005F   2???           00166         CALL    UART_Init
+0060   2???           00167         CALL    Temp_ControlUpdate
+                      00168 
+0061                  00169 MainLoop:
+                      00170 ; Display_Service:
+                      00171 ;  - Her loop'ta 1 digit yenilenir (multiplex)
+                      00172 ;  - Gecikmesiz cagirilmasi titreme/kararma riskini azaltir
+                      00173 
+0061   2???           00174         CALL    Display_Service
+                      00175 
+                      00176 ; UART_Service:
+                      00177 ;  - Blocking yapmadan RX buffer kontrol eder
+                      00178 ;  - OERR/FERR durumlarini toparlar
+                      00179 ;  - Projede UART ile hedef sicaklik guncelleme varsa burada flag setlenir
+                      00180 
+0062   2???           00181         CALL    UART_Service
+                      00182 
+                      00183 ; Keypad_Poll:
+                      00184 ;  - Scan + debounce (key_lock) yapar
+                      00185 ;  - key_ready=1 olursa Keypad_Process calisir
+                      00186 
+0063   2???           00187         CALL    Keypad_Poll
+                      00188 
+                      00189         ; keypad event?
+0064   1283 1303      00190         BANKSEL key_ready
+0066   08B3           00191         MOVF    key_ready, F
+0067   1903           00192         BTFSC   STATUS, Z
+0068   2???           00193         GOTO    _no_key
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0069   01B3           00194         CLRF    key_ready
+006A   2???           00195         CALL    Keypad_Process
+006B                  00196 _no_key:
+                      00197 
+                      00198         ; periodic ADC read requested?
+006B   1283 1303      00199         BANKSEL sys_flags
+006D   1C2C           00200         BTFSS   sys_flags, F_DO_ADC
+006E   2???           00201         GOTO    _no_adc
+006F   102C           00202         BCF     sys_flags, F_DO_ADC
+0070   2???           00203         CALL    Temp_ReadAmbient
+0071   2???           00204         CALL    Temp_ControlUpdate
+0072                  00205 _no_adc:
+                      00206 
+                      00207         ; display dirty?
+0072   1283 1303      00208         BANKSEL sys_flags
+0074   1CAC           00209         BTFSS   sys_flags, F_DISP_DIRTY
+0075   2???           00210         GOTO    _no_disp
+0076   10AC           00211         BCF     sys_flags, F_DISP_DIRTY
+0077   2???           00212         CALL    Display_Rebuild
+0078                  00213 _no_disp:
+                      00214 
+0078   2???           00215         GOTO    MainLoop
+                      00216 
+                      00217 
+                      00218 
+                      00219 ;========================
+                      00220 ; Include code blocks
+                      00221 ; (Bu dosyalar "Exclude from Build" olmal?)
+                      00222 ;========================
+                      00223         #include "tempctrl.asm"
+                      00001 ;============================================================
+                      00002 ; tempctrl.asm
+                      00003 ; Bu modul:
+                      00004 ;  - Timer1 ile 100ms tick uretir (ISR)
+                      00005 ;  - 1 saniyede bir:
+                      00006 ;      * fan_rps gunceller (TMR0 external counter)
+                      00007 ;      * error_timer countdown
+                      00008 ;      * display mode rotasyonu (2 saniyede bir)
+                      00009 ;      * main loop icin F_DO_ADC flag set eder
+                      00010 ;  - Temp_ReadAmbient: LM35 (AN0) ADC okur -> ambient_int/frac (xx.x)
+                      00011 ;  - Temp_ControlUpdate: desired vs ambient karsilastirir -> RE0/RE1 surer
+                      00012 ;============================================================
+                      00013 
+                      00014         #include "common.inc"
+                      00106 ;============================================================
+                      00107 ; common.inc
+                      00108 ; Target  : PIC16F877A
+                      00109 ; Project : Temperature System (Term Project)
+                      00110 ;
+                      00111 ; Bu dosya:
+                      00112 ;  - Konfig bitlerini (tek yerde) tanimlar
+                      00113 ;  - Tum moduller icin ortak sabitleri (MODE_*, NO_KEY, vb.)
+                      00114 ;  - sys_flags bit anlamlarini
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00115 ;  - RAM'deki global degiskenleri (CBLOCK 0x20) toplar
+                      00116 ;
+                      00117 ; Not:
+                      00118 ;  - CBLOCK degiskenleri tum .asm modullerinde ortak kullanilir.
+                      00119 ;  - BANKSEL kullanimi ile dogru bank secimi kritik.
+                      00120 ;============================================================
+                      00121 
+Warning[205]: Found directive in column 1. (IFNDEF)
+                      00122 IFNDEF COMMON_INC_LOADED
+                      00123 COMMON_INC_LOADED   EQU     1
+                      00124 
+                      00125         LIST    P=16F877A
+                      00126         #include <P16F877A.INC>
+                      00127 
+                      00128 ;------------ Config (SADECE 1 KERE) ------------
+                      00129         __CONFIG _WDT_OFF & _PWRTE_ON & _CP_OFF & _LVP_OFF & _BODEN_OFF & _HS_OSC
+                      00130 
+                      00131 ;------------ Constants ------------
+                      00132 MODE_DESIRED    EQU     0
+                      00133 MODE_AMBIENT    EQU     1
+                      00134 MODE_FAN        EQU     2
+                      00135 
+                      00136 NO_KEY          EQU     0xFF
+                      00137 
+                      00138 ; sys_flags bitleri (bit=1 iken isaretli/durum aktif):
+                      00139 F_DO_ADC        EQU     0 ; F_DO_ADC      : 1 saniyelik zamanlayici ADC okumasi istiyor (main loop okur)
+                      00140 F_DISP_DIRTY    EQU     1 ; F_DISP_DIRTY  : Ekran icerigi degisti -> Display_Rebuild cagirilacak
+                      00141 F_UART_GOT_FR   EQU     2 ; F_UART_GOT_FR : UART tarafindan yeni fraction (ondalik) geldi
+                      00142 F_UART_GOT_IN   EQU     3 ; F_UART_GOT_IN : UART tarafindan yeni integer geldi
+                      00143    
+                      00144 ; keypad entry_state
+                      00145 ENT_IDLE        EQU     0
+                      00146 ENT_D1          EQU     1
+                      00147 ENT_D2          EQU     2
+                      00148 ENT_STAR        EQU     3
+                      00149 ENT_FRAC        EQU     4
+                      00150 ENT_HASH        EQU     5
+                      00151 
+                      00152 ;------------ RAM ------------
+                      00153         CBLOCK  0x20
+                      00154 W_TEMP
+                      00155 STATUS_TEMP
+                      00156 PCLATH_TEMP
+                      00157 
+                      00158 desired_int
+                      00159 desired_frac
+                      00160 ambient_int
+                      00161 ambient_frac
+                      00162 fan_rps
+                      00163 ; desired_int/frac  : kullanici hedefi (xx.x)
+                      00164 ; ambient_int/frac  : LM35'ten okunan ortam (xx.x)
+                      00165 ; fan_rps           : 1 saniyede TMR0 sayimi (yaklasik rps)
+                      00166 
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00167 tick100ms
+                      00168 sec_counter
+                      00169 disp_mode
+                      00170 error_timer
+                      00171 sys_flags
+                      00172 ; tick100ms   : Timer1 ile 100ms sayaci (0..9)
+                      00173 ; sec_counter : display mode rotasyonu icin (2 saniyede bir)
+                      00174 ; disp_mode   : 0=desired,1=ambient,2=fan
+                      00175 ; error_timer : 0 degilse Display "EROR"
+                      00176 ; sys_flags   : bayraklar
+                      00177 
+                      00178 disp_idx
+                      00179 disp0
+                      00180 disp1
+                      00181 disp2
+                      00182 disp3
+                      00183 ; disp_idx : multiplex sira (0..3)
+                      00184 ; disp0..3 : RD portuna basilan segment pattern'leri
+                      00185 
+                      00186 key_last
+                      00187 key_ready
+                      00188 key_lock
+                      00189 entry_state
+                      00190 in_d1
+                      00191 in_d2
+                      00192 in_frac
+                      00193 ; key_last   : son kabul edilen tus (ASCII)
+                      00194 ; key_ready  : 1 ise main loop Keypad_Process yapar
+                      00195 ; key_lock   : debounce (1 tus/press)
+                      00196 ; entry_state: A XX*X# state machine
+                      00197 ; in_d1/in_d2/in_frac : girilen rakamlar (binary 0..9)
+                      00198 
+                      00199 uart_new_int
+                      00200 uart_new_frac
+                      00201 ; uart_new_int/frac : UART'tan gelen yeni hedef deger (xx.x)
+                      00202 ; tmp0..tmp3        : ortak scratch register'lar
+                      00203 
+                      00204 tmp0
+                      00205 tmp1
+                      00206 tmp2
+                      00207 tmp3
+                      00208         ENDC
+                      00209 
+                      00210 ENDIF
+                      00015 
+                      00016 ;------------------------------------------------------------
+                      00017 ; Reload Timer1 for 100ms tick
+                      00018 ; NOTE: This preload (0xCF2C) is correct for Fosc=4MHz, presc=1:8
+                      00019 ; Timer tick = (Fosc/4)/8 = 125kHz => 8us
+                      00020 ; 100ms / 8us = 12500 counts => preload = 65536-12500 = 0xCF2C
+                      00021 ; Not: Fosc farkliysa preload tekrar hesaplanmalidir.
+                      00022 ;------------------------------------------------------------
+0079                  00023 Temp_TMR1_Reload:
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0079   1283 1303      00024         BANKSEL TMR1H
+007B   30CF           00025         MOVLW   0xCF
+007C   008F           00026         MOVWF   TMR1H
+007D   302C           00027         MOVLW   0x2C
+007E   008E           00028         MOVWF   TMR1L
+007F   0008           00029         RETURN
+                      00030 
+                      00031 ;------------------------------------------------------------
+                      00032 ; Girdiler : yok (ISR context)
+                      00033 ; Ciktilar :
+                      00034 ;  - tick100ms (0..9)
+                      00035 ;  - fan_rps (1 saniyelik TMR0 sayimi)
+                      00036 ;  - error_timer azalir (0 degilse)
+                      00037 ;  - disp_mode 2 saniyede bir 0->1->2->0 (error yoksa)
+                      00038 ;  - sys_flags: F_DO_ADC ve F_DISP_DIRTY set edilir
+                      00039 ; Clobber : W/STATUS (ISR zaten save/restore yapiyor)
+                      00040 ;------------------------------------------------------------
+0080                  00041 Temp_TMR1_ISR:
+0080   1283 1303      00042         BANKSEL PIR1
+0082   100C           00043         BCF     PIR1, TMR1IF
+0083   2???           00044         CALL    Temp_TMR1_Reload
+                      00045 
+0084   1283 1303      00046         BANKSEL tick100ms
+0086   0AA8           00047         INCF    tick100ms, F
+0087   300A           00048         MOVLW   .10
+0088   0228           00049         SUBWF   tick100ms, W
+0089   1D03           00050         BTFSS   STATUS, Z
+008A   0008           00051         RETURN
+                      00052 
+                      00053         ; 1 second reached
+008B   01A8           00054         CLRF    tick100ms
+                      00055 
+                      00056         ; fan rps = TMR0 pulses in 1s
+008C   1283 1303      00057         BANKSEL TMR0
+008E   0801           00058         MOVF    TMR0, W
+008F   1283 1303      00059         BANKSEL fan_rps
+0091   00A7           00060         MOVWF   fan_rps
+0092   1283 1303      00061         BANKSEL TMR0
+0094   0181           00062         CLRF    TMR0
+                      00063 
+                      00064         ; error timer countdown
+0095   1283 1303      00065         BANKSEL error_timer
+0097   08AB           00066         MOVF    error_timer, F
+0098   1903           00067         BTFSC   STATUS, Z
+0099   2???           00068         GOTO    _no_err_dec
+009A   03AB           00069         DECF    error_timer, F
+009B   1283 1303      00070         BANKSEL sys_flags
+009D   14AC           00071         BSF     sys_flags, F_DISP_DIRTY
+009E                  00072 _no_err_dec:
+                      00073 
+                      00074         ; display mode change every 2 seconds (if not showing error)
+009E   1283 1303      00075         BANKSEL sec_counter
+00A0   0AA9           00076         INCF    sec_counter, F
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00A1   3002           00077         MOVLW   .2
+00A2   0229           00078         SUBWF   sec_counter, W
+00A3   1D03           00079         BTFSS   STATUS, Z
+00A4   2???           00080         GOTO    _sec_done
+                      00081 
+00A5   01A9           00082         CLRF    sec_counter
+                      00083 
+                      00084         ; if error active, do not rotate
+00A6   1283 1303      00085         BANKSEL error_timer
+00A8   08AB           00086         MOVF    error_timer, F
+00A9   1D03           00087         BTFSS   STATUS, Z
+00AA   2???           00088         GOTO    _sec_done
+                      00089 
+00AB   1283 1303      00090         BANKSEL disp_mode
+00AD   0AAA           00091         INCF    disp_mode, F
+00AE   3003           00092         MOVLW   .3
+00AF   022A           00093         SUBWF   disp_mode, W
+00B0   1D03           00094         BTFSS   STATUS, Z
+00B1   2???           00095         GOTO    _mode_ok
+00B2   01AA           00096         CLRF    disp_mode
+00B3                  00097 _mode_ok:
+00B3   1283 1303      00098         BANKSEL sys_flags
+00B5   14AC           00099         BSF     sys_flags, F_DISP_DIRTY
+                      00100 
+00B6                  00101 _sec_done:
+                      00102         ; request ADC update each second
+00B6   1283 1303      00103         BANKSEL sys_flags
+00B8   142C           00104         BSF     sys_flags, F_DO_ADC
+00B9   14AC           00105         BSF     sys_flags, F_DISP_DIRTY
+00BA   0008           00106         RETURN
+                      00107 
+                      00108 ;------------------------------------------------------------
+                      00109 ; LM35: 10mV/°C.
+                      00110 ; ADC LSB (5V ref, 10-bit) ~ 4.887mV.
+                      00111 ; 1°C icin ~2.046 ADC count eder.
+                      00112 ; Burada tam bolme yerine hizli yaklasim:
+                      00113 ;  temp_x10 ? adc * (4 + 1/2 + 1/4 + 1/8 + 1/128)
+                      00114 ; Bu carpani bit kaydirma + toplama ile elde ediyoruz.
+                      00115 ; Sonra /10 ile (int, frac) ayiriyoruz:
+                      00116 ;  ambient_int = temp_x10 / 10
+                      00117 ;  ambient_frac = temp_x10 % 10   (0..9)
+                      00118 ;------------------------------------------------------------
+00BB                  00119 Temp_ReadAmbient:
+                      00120         ; acquisition delay (~ küçük bekleme)
+00BB   1283 1303      00121         BANKSEL tmp0
+00BD   3014           00122         MOVLW   .20
+00BE   00BB           00123         MOVWF   tmp0
+00BF                  00124 _acq:
+00BF   0000           00125         NOP
+00C0   0BBB           00126         DECFSZ  tmp0, F
+00C1   2???           00127         GOTO    _acq
+                      00128 
+                      00129         ; start ADC
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00C2   1283 1303      00130         BANKSEL ADCON0
+00C4   151F           00131         BSF     ADCON0, GO_DONE
+00C5                  00132 _wait_adc:
+00C5   191F           00133         BTFSC   ADCON0, GO_DONE
+00C6   2???           00134         GOTO    _wait_adc
+                      00135 
+                      00136         ; read 10-bit right-justified: ADRESH:ADRESL -> tmp1:tmp0
+00C7   1683 1303      00137         BANKSEL ADRESL
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00C9   081E           00138         MOVF    ADRESL, W
+00CA   1283 1303      00139         BANKSEL tmp0
+00CC   00BB           00140         MOVWF   tmp0            ; adcL
+                      00141 
+00CD   1283 1303      00142         BANKSEL ADRESH
+00CF   081E           00143         MOVF    ADRESH, W
+00D0   1283 1303      00144         BANKSEL tmp1
+00D2   00BC           00145         MOVWF   tmp1            ; adcH
+                      00146 
+                      00147         ; accumulator tmp3:tmp2 = adc << 2  (LOGICAL shift, carry cleared each step)
+00D3   1283 1303      00148         BANKSEL tmp2
+00D5   083B           00149         MOVF    tmp0, W
+00D6   00BD           00150         MOVWF   tmp2            ; accL
+00D7   083C           00151         MOVF    tmp1, W
+00D8   00BE           00152         MOVWF   tmp3            ; accH
+                      00153 
+00D9   1003           00154         BCF     STATUS, C
+00DA   0DBD           00155         RLF     tmp2, F
+00DB   0DBE           00156         RLF     tmp3, F
+00DC   1003           00157         BCF     STATUS, C
+00DD   0DBD           00158         RLF     tmp2, F
+00DE   0DBE           00159         RLF     tmp3, F
+                      00160 
+                      00161         ; scratch = adc (ambient_frac:ambient_int used as scratch pair)
+00DF   1283 1303      00162         BANKSEL ambient_int
+00E1   083B           00163         MOVF    tmp0, W
+00E2   00A5           00164         MOVWF   ambient_int     ; scratch L
+00E3   083C           00165         MOVF    tmp1, W
+00E4   00A6           00166         MOVWF   ambient_frac    ; scratch H
+                      00167 
+                      00168         ; add adc>>1
+00E5   1003           00169         BCF     STATUS, C
+00E6   0CA6           00170         RRF     ambient_frac, F
+00E7   0CA5           00171         RRF     ambient_int, F
+00E8   2???           00172         CALL    _ADD_ACC
+                      00173 
+                      00174         ; add adc>>2  (shift one more, clear C!)
+00E9   1003           00175         BCF     STATUS, C
+00EA   0CA6           00176         RRF     ambient_frac, F
+00EB   0CA5           00177         RRF     ambient_int, F
+00EC   2???           00178         CALL    _ADD_ACC
+                      00179 
+                      00180         ; add adc>>3  (shift one more, clear C!)
+00ED   1003           00181         BCF     STATUS, C
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00EE   0CA6           00182         RRF     ambient_frac, F
+00EF   0CA5           00183         RRF     ambient_int, F
+00F0   2???           00184         CALL    _ADD_ACC
+                      00185 
+                      00186         ; add adc>>7 (rebuild scratch=adc then shift 7 times logically)
+00F1   1283 1303      00187         BANKSEL ambient_int
+00F3   083B           00188         MOVF    tmp0, W
+00F4   00A5           00189         MOVWF   ambient_int
+00F5   083C           00190         MOVF    tmp1, W
+00F6   00A6           00191         MOVWF   ambient_frac
+                      00192 
+00F7   3007           00193         MOVLW   .7
+00F8   1283 1303      00194         BANKSEL tmp0
+00FA   00BB           00195         MOVWF   tmp0
+00FB                  00196 _sh7:
+00FB   1003           00197         BCF     STATUS, C
+00FC   1283 1303      00198         BANKSEL ambient_int
+00FE   0CA6           00199         RRF     ambient_frac, F
+00FF   0CA5           00200         RRF     ambient_int, F
+0100   1283 1303      00201         BANKSEL tmp0
+0102   0BBB           00202         DECFSZ  tmp0, F
+0103   2???           00203         GOTO    _sh7
+0104   2???           00204         CALL    _ADD_ACC
+                      00205 
+                      00206 ; _div10:
+                      00207 ;  tmp3:tmp2  -> kalan (temp_x10)
+                      00208 ;  tmp1       -> bolum (ambient_int)
+                      00209 ; Her adimda 10 cikartip bolumu artiriyoruz (kucuk sayilar icin yeterli).
+                      00210 
+0105   1283 1303      00211         BANKSEL tmp1
+0107   01BC           00212         CLRF    tmp1         ; quotient
+0108                  00213 _div10:
+                      00214         ; if tmp3:tmp2 < 10 stop
+0108   1283 1303      00215         BANKSEL tmp3
+010A   083E           00216         MOVF    tmp3, W
+010B   1D03           00217         BTFSS   STATUS, Z
+010C   2???           00218         GOTO    _ge10
+010D   300A           00219         MOVLW   .10
+010E   1283 1303      00220         BANKSEL tmp2
+0110   023D           00221         SUBWF   tmp2, W
+0111   1C03           00222         BTFSS   STATUS, C
+0112   2???           00223         GOTO    _div_done
+0113                  00224 _ge10:
+                      00225         ; subtract 10 from tmp3:tmp2
+0113   300A           00226         MOVLW   .10
+0114   1283 1303      00227         BANKSEL tmp2
+0116   02BD           00228         SUBWF   tmp2, F
+0117   1C03           00229         BTFSS   STATUS, C
+0118   1283 1303      00230         BANKSEL tmp3
+011A   1C03           00231         BTFSS   STATUS, C
+011B   03BE           00232         DECF    tmp3, F
+011C   1283 1303      00233         BANKSEL tmp1
+011E   0ABC           00234         INCF    tmp1, F
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+011F   2???           00235         GOTO    _div10
+                      00236 
+0120                  00237 _div_done:
+0120   1283 1303      00238         BANKSEL ambient_int
+0122   083C           00239         MOVF    tmp1, W
+0123   00A5           00240         MOVWF   ambient_int
+0124   1283 1303      00241         BANKSEL tmp2
+0126   083D           00242         MOVF    tmp2, W
+0127   1283 1303      00243         BANKSEL ambient_frac
+0129   00A6           00244         MOVWF   ambient_frac
+                      00245 
+012A   1283 1303      00246         BANKSEL sys_flags
+012C   14AC           00247         BSF     sys_flags, F_DISP_DIRTY
+012D   0008           00248         RETURN
+                      00249 
+                      00250 ; helper: acc(tmp3:tmp2) += scratch(ambient_frac:ambient_int)
+012E                  00251 _ADD_ACC:
+012E   1283 1303      00252         BANKSEL ambient_int
+0130   0825           00253         MOVF    ambient_int, W
+0131   1283 1303      00254         BANKSEL tmp2
+0133   07BD           00255         ADDWF   tmp2, F
+0134   1803           00256         BTFSC   STATUS, C
+0135   0ABE           00257         INCF    tmp3, F
+0136   1283 1303      00258         BANKSEL ambient_frac
+0138   0826           00259         MOVF    ambient_frac, W
+0139   1283 1303      00260         BANKSEL tmp3
+013B   07BE           00261         ADDWF   tmp3, F
+013C   0008           00262         RETURN
+                      00263 
+                      00264 ;------------------------------------------------------------
+                      00265 ; Temp_ControlUpdate
+                      00266 ; Amaç:
+                      00267 ;  desired (hedef) ile ambient (ortam) karsilastirilir.
+                      00268 ;  - hedef > ortam  => Heater ON, Cooler OFF
+                      00269 ;  - hedef < ortam  => Cooler ON, Heater OFF
+                      00270 ;  - esit / cok yakin => ikisi de OFF (veya kodun yaptigi durum)
+                      00271 ; Not:
+                      00272 ;  Karsilastirma once integer, sonra fraction ile yapilir.
+                      00273 ;------------------------------------------------------------
+013D                  00274 Temp_ControlUpdate:
+                      00275         ; compare desired vs ambient using int then frac
+013D   1283 1303      00276         BANKSEL desired_int
+013F   0825           00277         MOVF    ambient_int, W
+0140   0223           00278         SUBWF   desired_int, W     ; W = desired_int - ambient_int
+0141   1D03           00279         BTFSS   STATUS, Z
+0142   2???           00280         GOTO    _int_diff
+                      00281 
+                      00282         ; int equal -> compare frac
+0143   1283 1303      00283         BANKSEL desired_frac
+0145   0826           00284         MOVF    ambient_frac, W
+0146   0224           00285         SUBWF   desired_frac, W
+0147   1D03           00286         BTFSS   STATUS, Z
+0148   2???           00287         GOTO    _frac_diff
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00288 
+                      00289         ; equal -> both off
+0149   1283 1303      00290         BANKSEL PORTE
+014B   1009           00291         BCF     PORTE, 0
+014C   1089           00292         BCF     PORTE, 1
+014D   0008           00293         RETURN
+                      00294 
+014E                  00295 _int_diff:
+                      00296         ; if desired - ambient >= 0 => desired > ambient
+014E   1C03           00297         BTFSS   STATUS, C
+014F   2???           00298         GOTO    _desired_lt
+0150   2???           00299         GOTO    _desired_gt
+                      00300 
+0151                  00301 _frac_diff:
+0151   1C03           00302         BTFSS   STATUS, C
+0152   2???           00303         GOTO    _desired_lt
+0153   2???           00304         GOTO    _desired_gt
+                      00305 
+0154                  00306 _desired_gt:
+                      00307         ; desired > ambient -> HEATER ON, COOLER OFF
+0154   1283 1303      00308         BANKSEL PORTE
+0156   1409           00309         BSF     PORTE, 0
+0157   1089           00310         BCF     PORTE, 1
+0158   0008           00311         RETURN
+                      00312 
+0159                  00313 _desired_lt:
+                      00314         ; desired < ambient -> HEATER OFF, COOLER ON
+0159   1283 1303      00315         BANKSEL PORTE
+015B   1009           00316         BCF     PORTE, 0
+015C   1489           00317         BSF     PORTE, 1
+015D   0008           00318         RETURN
+                      00319 
+                      00224         #include "keypad.asm"
+                      00001 ;========================
+                      00002 ; keypad.asm (REWRITE - stable)
+                      00003 ; PIC16F877A - 4x4 keypad
+                      00004 ; Rows: RB4..RB7 (inputs with pull-ups)
+                      00005 ; Cols: RB0..RB3 (outputs)
+                      00006 ; Layout:
+                      00007 ;   1 2 3 A
+                      00008 ;   4 5 6 B
+                      00009 ;   7 8 9 C
+                      00010 ;   * 0 # D
+                      00011 ;
+                      00012 ; Giri? Formati:  A  X  X  *  X  #
+                      00013 ; Uygun aralik: 10.0 .. 50.0   (50.x INVALID)
+                      00014 ; Invalid -> error_timer -> Display "EROR"
+                      00015 ; Keypad tarama prensibi:
+                      00016 ;  - RB0..RB3 kolon output: tek tek LOW yapilir (aktif kolon)
+                      00017 ;  - RB4..RB7 satir input + pull-up: basilan tus satiri LOW okutur
+                      00018 ;  - row/col -> index (0..15) -> ASCII map
+                      00019 ;
+                      00020 ; Debounce:
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 16
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00021 ;  key_lock=1 iken yeni tusa izin verilmez.
+                      00022 ;  Tus birakilinca (NO_KEY) key_lock temizlenir.
+                      00023 ;========================
+                      00024         #include "common.inc"
+                      00211 ;============================================================
+                      00212 ; common.inc
+                      00213 ; Target  : PIC16F877A
+                      00214 ; Project : Temperature System (Term Project)
+                      00215 ;
+                      00216 ; Bu dosya:
+                      00217 ;  - Konfig bitlerini (tek yerde) tanimlar
+                      00218 ;  - Tum moduller icin ortak sabitleri (MODE_*, NO_KEY, vb.)
+                      00219 ;  - sys_flags bit anlamlarini
+                      00220 ;  - RAM'deki global degiskenleri (CBLOCK 0x20) toplar
+                      00221 ;
+                      00222 ; Not:
+                      00223 ;  - CBLOCK degiskenleri tum .asm modullerinde ortak kullanilir.
+                      00224 ;  - BANKSEL kullanimi ile dogru bank secimi kritik.
+                      00225 ;============================================================
+                      00226 
+Warning[205]: Found directive in column 1. (IFNDEF)
+                      00227 IFNDEF COMMON_INC_LOADED
+                      00228 COMMON_INC_LOADED   EQU     1
+                      00229 
+                      00230         LIST    P=16F877A
+                      00231         #include <P16F877A.INC>
+                      00232 
+                      00233 ;------------ Config (SADECE 1 KERE) ------------
+                      00234         __CONFIG _WDT_OFF & _PWRTE_ON & _CP_OFF & _LVP_OFF & _BODEN_OFF & _HS_OSC
+                      00235 
+                      00236 ;------------ Constants ------------
+                      00237 MODE_DESIRED    EQU     0
+                      00238 MODE_AMBIENT    EQU     1
+                      00239 MODE_FAN        EQU     2
+                      00240 
+                      00241 NO_KEY          EQU     0xFF
+                      00242 
+                      00243 ; sys_flags bitleri (bit=1 iken isaretli/durum aktif):
+                      00244 F_DO_ADC        EQU     0 ; F_DO_ADC      : 1 saniyelik zamanlayici ADC okumasi istiyor (main loop okur)
+                      00245 F_DISP_DIRTY    EQU     1 ; F_DISP_DIRTY  : Ekran icerigi degisti -> Display_Rebuild cagirilacak
+                      00246 F_UART_GOT_FR   EQU     2 ; F_UART_GOT_FR : UART tarafindan yeni fraction (ondalik) geldi
+                      00247 F_UART_GOT_IN   EQU     3 ; F_UART_GOT_IN : UART tarafindan yeni integer geldi
+                      00248    
+                      00249 ; keypad entry_state
+                      00250 ENT_IDLE        EQU     0
+                      00251 ENT_D1          EQU     1
+                      00252 ENT_D2          EQU     2
+                      00253 ENT_STAR        EQU     3
+                      00254 ENT_FRAC        EQU     4
+                      00255 ENT_HASH        EQU     5
+                      00256 
+                      00257 ;------------ RAM ------------
+                      00258         CBLOCK  0x20
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 17
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00259 W_TEMP
+                      00260 STATUS_TEMP
+                      00261 PCLATH_TEMP
+                      00262 
+                      00263 desired_int
+                      00264 desired_frac
+                      00265 ambient_int
+                      00266 ambient_frac
+                      00267 fan_rps
+                      00268 ; desired_int/frac  : kullanici hedefi (xx.x)
+                      00269 ; ambient_int/frac  : LM35'ten okunan ortam (xx.x)
+                      00270 ; fan_rps           : 1 saniyede TMR0 sayimi (yaklasik rps)
+                      00271 
+                      00272 tick100ms
+                      00273 sec_counter
+                      00274 disp_mode
+                      00275 error_timer
+                      00276 sys_flags
+                      00277 ; tick100ms   : Timer1 ile 100ms sayaci (0..9)
+                      00278 ; sec_counter : display mode rotasyonu icin (2 saniyede bir)
+                      00279 ; disp_mode   : 0=desired,1=ambient,2=fan
+                      00280 ; error_timer : 0 degilse Display "EROR"
+                      00281 ; sys_flags   : bayraklar
+                      00282 
+                      00283 disp_idx
+                      00284 disp0
+                      00285 disp1
+                      00286 disp2
+                      00287 disp3
+                      00288 ; disp_idx : multiplex sira (0..3)
+                      00289 ; disp0..3 : RD portuna basilan segment pattern'leri
+                      00290 
+                      00291 key_last
+                      00292 key_ready
+                      00293 key_lock
+                      00294 entry_state
+                      00295 in_d1
+                      00296 in_d2
+                      00297 in_frac
+                      00298 ; key_last   : son kabul edilen tus (ASCII)
+                      00299 ; key_ready  : 1 ise main loop Keypad_Process yapar
+                      00300 ; key_lock   : debounce (1 tus/press)
+                      00301 ; entry_state: A XX*X# state machine
+                      00302 ; in_d1/in_d2/in_frac : girilen rakamlar (binary 0..9)
+                      00303 
+                      00304 uart_new_int
+                      00305 uart_new_frac
+                      00306 ; uart_new_int/frac : UART'tan gelen yeni hedef deger (xx.x)
+                      00307 ; tmp0..tmp3        : ortak scratch register'lar
+                      00308 
+                      00309 tmp0
+                      00310 tmp1
+                      00311 tmp2
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 18
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00312 tmp3
+                      00313         ENDC
+                      00314 
+                      00315 ENDIF
+                      00025 
+                      00026 ;------------------------------------------------------------
+                      00027 ; Optional RB-change ISR handler
+                      00028 ; (RBIE kapal?ysa zaten ça?r?lmaz, sorun de?il)
+                      00029 ;------------------------------------------------------------
+015E                  00030 Keypad_RB_ISR:
+015E   1283 1303      00031         BANKSEL PORTB
+0160   0806           00032         MOVF    PORTB, W          ; clear mismatch
+0161   1283 1303      00033         BANKSEL INTCON
+0163   100B           00034         BCF     INTCON, RBIF
+0164   0008           00035         RETURN
+                      00036 
+                      00037 ;------------------------------------------------------------
+                      00038 ; IN : yok
+                      00039 ; OUT:
+                      00040 ;   key_ready=1 ise main loop Keypad_Process yapmali
+                      00041 ;   key_last  = kabul edilen tus (ASCII)
+                      00042 ;------------------------------------------------------------
+0165                  00043 Keypad_Poll:
+                      00044         ; if a key is already pending, do nothing
+0165   1283 1303      00045         BANKSEL key_ready
+0167   08B3           00046         MOVF    key_ready, F
+0168   1D03           00047         BTFSS   STATUS, Z
+0169   0008           00048         RETURN
+                      00049 
+016A   2???           00050         CALL    Keypad_Scan        ; W = ASCII or NO_KEY
+016B   1283 1303      00051         BANKSEL tmp0
+016D   00BB           00052         MOVWF   tmp0
+                      00053 
+                      00054         ; NO_KEY ?
+016E   083B           00055         MOVF    tmp0, W
+016F   3AFF           00056         XORLW   NO_KEY
+0170   1903           00057         BTFSC   STATUS, Z
+0171   2???           00058         GOTO    _kp_rel
+                      00059 
+                      00060         ; pressed -> if locked ignore
+0172   1283 1303      00061         BANKSEL key_lock
+0174   08B4           00062         MOVF    key_lock, F
+0175   1D03           00063         BTFSS   STATUS, Z
+0176   0008           00064         RETURN
+                      00065 
+                      00066         ; accept new key
+0177   3001           00067         MOVLW   0x01
+0178   00B4           00068         MOVWF   key_lock
+                      00069 
+0179   1283 1303      00070         BANKSEL key_last
+017B   083B           00071         MOVF    tmp0, W
+017C   00B2           00072         MOVWF   key_last
+                      00073 
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 19
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+017D   1283 1303      00074         BANKSEL key_ready
+017F   3001           00075         MOVLW   0x01
+0180   00B3           00076         MOVWF   key_ready
+0181   0008           00077         RETURN
+                      00078 
+0182                  00079 _kp_rel:
+                      00080         ; released -> unlock
+0182   1283 1303      00081         BANKSEL key_lock
+0184   01B4           00082         CLRF    key_lock
+0185   0008           00083         RETURN
+                      00084 
+                      00085 ;------------------------------------------------------------
+                      00086 ; Keypad_Scan
+                      00087 ; Returns W = ASCII key, or NO_KEY (0xFF)
+                      00088 ; Leaves idle with ALL columns LOW (RB0..RB3=0)
+                      00089 ;------------------------------------------------------------
+0186                  00090 Keypad_Scan:
+                      00091         ; COL0 low (RB0=0, RB1..RB3=1) => 1110b = 0x0E
+0186   1283 1303      00092         BANKSEL PORTB
+0188   300E           00093         MOVLW   0x0E
+0189   0086           00094         MOVWF   PORTB
+018A   2???           00095         CALL    _ReadRow
+018B   1D03           00096         BTFSS   STATUS, Z
+018C   2???           00097         GOTO    _c0
+                      00098 
+                      00099         ; COL1 low => 1101b = 0x0D
+018D   300D           00100         MOVLW   0x0D
+018E   0086           00101         MOVWF   PORTB
+018F   2???           00102         CALL    _ReadRow
+0190   1D03           00103         BTFSS   STATUS, Z
+0191   2???           00104         GOTO    _c1
+                      00105 
+                      00106         ; COL2 low => 1011b = 0x0B
+0192   300B           00107         MOVLW   0x0B
+0193   0086           00108         MOVWF   PORTB
+0194   2???           00109         CALL    _ReadRow
+0195   1D03           00110         BTFSS   STATUS, Z
+0196   2???           00111         GOTO    _c2
+                      00112 
+                      00113         ; COL3 low => 0111b = 0x07
+0197   3007           00114         MOVLW   0x07
+0198   0086           00115         MOVWF   PORTB
+0199   2???           00116         CALL    _ReadRow
+019A   1D03           00117         BTFSS   STATUS, Z
+019B   2???           00118         GOTO    _c3
+                      00119 
+                      00120         ; none
+019C   1283 1303      00121         BANKSEL PORTB
+019E   0186           00122         CLRF    PORTB              ; idle = columns LOW
+019F   30FF           00123         MOVLW   NO_KEY
+01A0   0008           00124         RETURN
+                      00125 
+01A1                  00126 _c0:
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 20
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01A1   083C           00127         MOVF    tmp1, W
+01A2   2???           00128         CALL    _RowMul4
+                      00129         ; +0
+01A3   2???           00130         CALL    _KeyMap
+01A4   2???           00131         GOTO    _scan_done
+01A5                  00132 _c1:
+01A5   083C           00133         MOVF    tmp1, W
+01A6   2???           00134         CALL    _RowMul4
+01A7   3E01           00135         ADDLW   .1
+01A8   2???           00136         CALL    _KeyMap
+01A9   2???           00137         GOTO    _scan_done
+01AA                  00138 _c2:
+01AA   083C           00139         MOVF    tmp1, W
+01AB   2???           00140         CALL    _RowMul4
+01AC   3E02           00141         ADDLW   .2
+01AD   2???           00142         CALL    _KeyMap
+01AE   2???           00143         GOTO    _scan_done
+01AF                  00144 _c3:
+01AF   083C           00145         MOVF    tmp1, W
+01B0   2???           00146         CALL    _RowMul4
+01B1   3E03           00147         ADDLW   .3
+01B2   2???           00148         CALL    _KeyMap
+01B3   2???           00149         GOTO    _scan_done
+                      00150 
+01B4                  00151 _scan_done:
+01B4   1283 1303      00152         BANKSEL tmp2
+01B6   00BD           00153         MOVWF   tmp2               ; save ASCII
+01B7   1283 1303      00154         BANKSEL PORTB
+01B9   0186           00155         CLRF    PORTB              ; idle = columns LOW
+01BA   1283 1303      00156         BANKSEL tmp2
+01BC   083D           00157         MOVF    tmp2, W
+01BD   0008           00158         RETURN
+                      00159 
+                      00160 ;------------------------------------------------------------
+                      00161 ; _ReadRow
+                      00162 ; OUT:
+                      00163 ;   - NO press: returns with Z=1
+                      00164 ;   - press   : tmp1 = row index (0..3), returns with Z=0
+                      00165 ;------------------------------------------------------------
+01BE                  00166 _ReadRow:
+01BE   0000           00167         NOP
+01BF   0000           00168         NOP
+01C0   1283 1303      00169         BANKSEL PORTB
+01C2   0806           00170         MOVF    PORTB, W
+01C3   39F0           00171         ANDLW   0xF0
+01C4   3AF0           00172         XORLW   0xF0
+01C5   1903           00173         BTFSC   STATUS, Z
+01C6   0008           00174         RETURN                    ; Z=1 (no press)
+                      00175 
+                      00176         ; find which row is LOW
+01C7   1283 1303      00177         BANKSEL PORTB
+01C9   1E06           00178         BTFSS   PORTB, 4
+01CA   2???           00179         GOTO    _r0
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 21
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01CB   1E86           00180         BTFSS   PORTB, 5
+01CC   2???           00181         GOTO    _r1
+01CD   1F06           00182         BTFSS   PORTB, 6
+01CE   2???           00183         GOTO    _r2
+                      00184         ; else row3
+01CF   1283 1303      00185         BANKSEL tmp1
+01D1   3003           00186         MOVLW   .3
+01D2   00BC           00187         MOVWF   tmp1
+01D3   2???           00188         GOTO    _pressed
+01D4                  00189 _r0:
+01D4   1283 1303      00190         BANKSEL tmp1
+01D6   01BC           00191         CLRF    tmp1
+01D7   2???           00192         GOTO    _pressed
+01D8                  00193 _r1:
+01D8   1283 1303      00194         BANKSEL tmp1
+01DA   3001           00195         MOVLW   .1
+01DB   00BC           00196         MOVWF   tmp1
+01DC   2???           00197         GOTO    _pressed
+01DD                  00198 _r2:
+01DD   1283 1303      00199         BANKSEL tmp1
+01DF   3002           00200         MOVLW   .2
+01E0   00BC           00201         MOVWF   tmp1
+01E1                  00202 _pressed:
+                      00203         ; force Z=0 before returning (W don't care)
+01E1   3001           00204         MOVLW   0x01
+01E2   3800           00205         IORLW   0x00
+01E3   0008           00206         RETURN
+                      00207 
+                      00208 ; W=row -> W=row*4
+01E4                  00209 _RowMul4:
+01E4   1283 1303      00210         BANKSEL tmp2
+01E6   00BD           00211         MOVWF   tmp2
+01E7   1003           00212         BCF     STATUS, C
+01E8   0DBD           00213         RLF     tmp2, F
+01E9   1003           00214         BCF     STATUS, C
+01EA   0DBD           00215         RLF     tmp2, F
+01EB   083D           00216         MOVF    tmp2, W
+01EC   0008           00217         RETURN
+                      00218 
+                      00219 ;------------------------------------------------------------
+                      00220 ; _KeyMap (no jump-table -> PCLATH safe)
+                      00221 ; IN:  W=index 0..15
+                      00222 ; OUT: W=ASCII
+                      00223 ;------------------------------------------------------------
+01ED                  00224 _KeyMap:
+01ED   1283 1303      00225         BANKSEL tmp0
+01EF   00BB           00226         MOVWF   tmp0
+                      00227 
+01F0   3000           00228         MOVLW   .0
+01F1   063B           00229         XORWF   tmp0, W
+01F2   1903           00230         BTFSC   STATUS, Z
+01F3   3431           00231         RETLW   '1'
+01F4   3001           00232         MOVLW   .1
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 22
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01F5   063B           00233         XORWF   tmp0, W
+01F6   1903           00234         BTFSC   STATUS, Z
+01F7   3432           00235         RETLW   '2'
+01F8   3002           00236         MOVLW   .2
+01F9   063B           00237         XORWF   tmp0, W
+01FA   1903           00238         BTFSC   STATUS, Z
+01FB   3433           00239         RETLW   '3'
+01FC   3003           00240         MOVLW   .3
+01FD   063B           00241         XORWF   tmp0, W
+01FE   1903           00242         BTFSC   STATUS, Z
+01FF   3441           00243         RETLW   'A'
+                      00244 
+0200   3004           00245         MOVLW   .4
+0201   063B           00246         XORWF   tmp0, W
+0202   1903           00247         BTFSC   STATUS, Z
+0203   3434           00248         RETLW   '4'
+0204   3005           00249         MOVLW   .5
+0205   063B           00250         XORWF   tmp0, W
+0206   1903           00251         BTFSC   STATUS, Z
+0207   3435           00252         RETLW   '5'
+0208   3006           00253         MOVLW   .6
+0209   063B           00254         XORWF   tmp0, W
+020A   1903           00255         BTFSC   STATUS, Z
+020B   3436           00256         RETLW   '6'
+020C   3007           00257         MOVLW   .7
+020D   063B           00258         XORWF   tmp0, W
+020E   1903           00259         BTFSC   STATUS, Z
+020F   3442           00260         RETLW   'B'
+                      00261 
+0210   3008           00262         MOVLW   .8
+0211   063B           00263         XORWF   tmp0, W
+0212   1903           00264         BTFSC   STATUS, Z
+0213   3437           00265         RETLW   '7'
+0214   3009           00266         MOVLW   .9
+0215   063B           00267         XORWF   tmp0, W
+0216   1903           00268         BTFSC   STATUS, Z
+0217   3438           00269         RETLW   '8'
+0218   300A           00270         MOVLW   .10
+0219   063B           00271         XORWF   tmp0, W
+021A   1903           00272         BTFSC   STATUS, Z
+021B   3439           00273         RETLW   '9'
+021C   300B           00274         MOVLW   .11
+021D   063B           00275         XORWF   tmp0, W
+021E   1903           00276         BTFSC   STATUS, Z
+021F   3443           00277         RETLW   'C'
+                      00278 
+0220   300C           00279         MOVLW   .12
+0221   063B           00280         XORWF   tmp0, W
+0222   1903           00281         BTFSC   STATUS, Z
+0223   342A           00282         RETLW   '*'
+0224   300D           00283         MOVLW   .13
+0225   063B           00284         XORWF   tmp0, W
+0226   1903           00285         BTFSC   STATUS, Z
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 23
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0227   3430           00286         RETLW   '0'
+0228   300E           00287         MOVLW   .14
+0229   063B           00288         XORWF   tmp0, W
+022A   1903           00289         BTFSC   STATUS, Z
+022B   3423           00290         RETLW   '#'
+022C   300F           00291         MOVLW   .15
+022D   063B           00292         XORWF   tmp0, W
+022E   1903           00293         BTFSC   STATUS, Z
+022F   3444           00294         RETLW   'D'
+                      00295 
+0230   34FF           00296         RETLW   NO_KEY
+                      00297 
+                      00298 ;------------------------------------------------------------
+                      00299 ; Keypad_Process (A XX*X #)
+                      00300 ;------------------------------------------------------------
+0231                  00301 Keypad_Process:
+0231   1283 1303      00302         BANKSEL key_last
+0233   0832           00303         MOVF    key_last, W
+                      00304 
+                      00305         ; 'A' always starts entry
+0234   3A41           00306         XORLW   'A'
+0235   1903           00307         BTFSC   STATUS, Z
+0236   2???           00308         GOTO    _start_entry
+                      00309 
+                      00310         ; if idle -> ignore
+0237   1283 1303      00311         BANKSEL entry_state
+0239   08B5           00312         MOVF    entry_state, F
+023A   1903           00313         BTFSC   STATUS, Z
+023B   0008           00314         RETURN
+                      00315 
+                      00316         ; dispatch by entry_state
+023C   0835           00317         MOVF    entry_state, W
+023D   3A01           00318         XORLW   .1
+023E   1903           00319         BTFSC   STATUS, Z
+023F   2???           00320         GOTO    _digit1
+                      00321 
+0240   0835           00322         MOVF    entry_state, W
+0241   3A02           00323         XORLW   .2
+0242   1903           00324         BTFSC   STATUS, Z
+0243   2???           00325         GOTO    _digit2
+                      00326 
+0244   0835           00327         MOVF    entry_state, W
+0245   3A03           00328         XORLW   .3
+0246   1903           00329         BTFSC   STATUS, Z
+0247   2???           00330         GOTO    _expect_star
+                      00331 
+0248   0835           00332         MOVF    entry_state, W
+0249   3A04           00333         XORLW   .4
+024A   1903           00334         BTFSC   STATUS, Z
+024B   2???           00335         GOTO    _frac
+                      00336 
+024C   0835           00337         MOVF    entry_state, W
+024D   3A05           00338         XORLW   .5
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 24
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+024E   1903           00339         BTFSC   STATUS, Z
+024F   2???           00340         GOTO    _expect_hash
+                      00341 
+0250   0008           00342         RETURN
+                      00343 
+0251                  00344 _start_entry:
+0251   1283 1303      00345         BANKSEL entry_state
+0253   3001           00346         MOVLW   .1
+0254   00B5           00347         MOVWF   entry_state
+0255   1283 1303      00348         BANKSEL in_d1
+0257   01B6           00349         CLRF    in_d1
+0258   01B7           00350         CLRF    in_d2
+0259   01B8           00351         CLRF    in_frac
+025A   0008           00352         RETURN
+                      00353 
+025B                  00354 _digit1:
+025B   1283 1303      00355         BANKSEL key_last
+025D   0832           00356         MOVF    key_last, W
+025E   2???           00357         CALL    _AsciiDigitToBin
+025F   1803           00358         BTFSC   STATUS, C
+0260   0008           00359         RETURN
+0261   1283 1303      00360         BANKSEL in_d1
+0263   00B6           00361         MOVWF   in_d1
+0264   1283 1303      00362         BANKSEL entry_state
+0266   3002           00363         MOVLW   .2
+0267   00B5           00364         MOVWF   entry_state
+0268   0008           00365         RETURN
+                      00366 
+0269                  00367 _digit2:
+0269   1283 1303      00368         BANKSEL key_last
+026B   0832           00369         MOVF    key_last, W
+026C   2???           00370         CALL    _AsciiDigitToBin
+026D   1803           00371         BTFSC   STATUS, C
+026E   0008           00372         RETURN
+026F   1283 1303      00373         BANKSEL in_d2
+0271   00B7           00374         MOVWF   in_d2
+0272   1283 1303      00375         BANKSEL entry_state
+0274   3003           00376         MOVLW   .3
+0275   00B5           00377         MOVWF   entry_state
+0276   0008           00378         RETURN
+                      00379 
+0277                  00380 _expect_star:
+0277   1283 1303      00381         BANKSEL key_last
+0279   0832           00382         MOVF    key_last, W
+027A   3A2A           00383         XORLW   '*'
+027B   1D03           00384         BTFSS   STATUS, Z
+027C   0008           00385         RETURN
+027D   1283 1303      00386         BANKSEL entry_state
+027F   3004           00387         MOVLW   .4
+0280   00B5           00388         MOVWF   entry_state
+0281   0008           00389         RETURN
+                      00390 
+0282                  00391 _frac:
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 25
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0282   1283 1303      00392         BANKSEL key_last
+0284   0832           00393         MOVF    key_last, W
+0285   2???           00394         CALL    _AsciiDigitToBin
+0286   1803           00395         BTFSC   STATUS, C
+0287   0008           00396         RETURN
+0288   1283 1303      00397         BANKSEL in_frac
+028A   00B8           00398         MOVWF   in_frac
+028B   1283 1303      00399         BANKSEL entry_state
+028D   3005           00400         MOVLW   .5
+028E   00B5           00401         MOVWF   entry_state
+028F   0008           00402         RETURN
+                      00403 
+0290                  00404 _expect_hash:
+0290   1283 1303      00405         BANKSEL key_last
+0292   0832           00406         MOVF    key_last, W
+0293   3A23           00407         XORLW   '#'
+0294   1D03           00408         BTFSS   STATUS, Z
+0295   0008           00409         RETURN
+                      00410 
+0296   2???           00411         CALL    _CommitDesiredIfValid
+                      00412 
+0297   1283 1303      00413         BANKSEL entry_state
+0299   01B5           00414         CLRF    entry_state
+029A   0008           00415         RETURN
+                      00416 
+                      00417 ;------------------------------------------------------------
+                      00418 ; _AsciiDigitToBin
+                      00419 ; IN:  W=ASCII
+                      00420 ; OUT: W=0..9, C=0 ok / C=1 bad
+                      00421 ;------------------------------------------------------------
+029B                  00422 _AsciiDigitToBin:
+029B   1283 1303      00423         BANKSEL tmp0
+029D   00BB           00424         MOVWF   tmp0
+                      00425 
+029E   3030           00426         MOVLW   '0'
+029F   023B           00427         SUBWF   tmp0, W            ; W = tmp0 - '0'
+02A0   1C03           00428         BTFSS   STATUS, C
+02A1   2???           00429         GOTO    _bad_digit
+02A2   303A           00430         MOVLW   '9'+1
+02A3   023B           00431         SUBWF   tmp0, W            ; W = tmp0 - ('9'+1)
+02A4   1803           00432         BTFSC   STATUS, C
+02A5   2???           00433         GOTO    _bad_digit
+                      00434 
+02A6   1283 1303      00435         BANKSEL tmp0
+02A8   083B           00436         MOVF    tmp0, W
+02A9   3ED0           00437         ADDLW   -'0'
+02AA   1003           00438         BCF     STATUS, C
+02AB   0008           00439         RETURN
+                      00440 
+02AC                  00441 _bad_digit:
+02AC   1403           00442         BSF     STATUS, C
+02AD   0008           00443         RETURN
+                      00444 
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 26
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00445 ;------------------------------------------------------------
+                      00446 ; _CommitDesiredIfValid
+                      00447 ; int = 10*in_d1 + in_d2
+                      00448 ; frac = in_frac
+                      00449 ; valid: 10.0 .. 50.0 (50.x invalid)
+                      00450 ; Kabul edilirse:
+                      00451 ;  desired_int/desired_frac yazilir,
+                      00452 ;  disp_mode = MODE_DESIRED yapilip hemen gosterilir,
+                      00453 ;  Display_Rebuild icin F_DISP_DIRTY set edilir,
+                      00454 ;  Temp_ControlUpdate cagrilir (cikislar aninda guncellensin diye).
+                      00455 ;------------------------------------------------------------
+02AE                  00456 _CommitDesiredIfValid:
+                      00457 
+                      00458         ; tmp0 = 10*in_d1 + in_d2
+                      00459         ; tmp0 = (in_d1*8) + (in_d1*2) + in_d2
+02AE   1283 1303      00460         BANKSEL in_d1
+02B0   0836           00461         MOVF    in_d1, W
+02B1   00BC           00462         MOVWF   tmp1            ; tmp1 = d1
+                      00463 
+                      00464         ; tmp2 = d1*8
+02B2   083C           00465         MOVF    tmp1, W
+02B3   00BD           00466         MOVWF   tmp2
+02B4   1003           00467         BCF     STATUS, C
+02B5   0DBD           00468         RLF     tmp2, F         ; *2
+02B6   1003           00469         BCF     STATUS, C
+02B7   0DBD           00470         RLF     tmp2, F         ; *4
+02B8   1003           00471         BCF     STATUS, C
+02B9   0DBD           00472         RLF     tmp2, F         ; *8
+                      00473 
+                      00474         ; tmp0 = d1*2
+02BA   083C           00475         MOVF    tmp1, W
+02BB   00BB           00476         MOVWF   tmp0
+02BC   1003           00477         BCF     STATUS, C
+02BD   0DBB           00478         RLF     tmp0, F         ; *2
+                      00479 
+                      00480         ; tmp0 = d1*10
+02BE   083D           00481         MOVF    tmp2, W
+02BF   07BB           00482         ADDWF   tmp0, F
+                      00483 
+                      00484         ; tmp0 = d1*10 + d2
+02C0   1283 1303      00485         BANKSEL in_d2
+02C2   0837           00486         MOVF    in_d2, W
+02C3   07BB           00487         ADDWF   tmp0, F
+                      00488 
+                      00489         ; ----- Range checks -----
+                      00490         ; int >= 10 ?
+02C4   300A           00491         MOVLW   .10
+02C5   023B           00492         SUBWF   tmp0, W          ; W = int - 10
+02C6   1C03           00493         BTFSS   STATUS, C
+02C7   2???           00494         GOTO    _kp_invalid
+                      00495 
+                      00496         ; int <= 50 ?  (invalid if int >= 51)
+02C8   3033           00497         MOVLW   .51
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 27
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+02C9   023B           00498         SUBWF   tmp0, W          ; W = int - 51
+02CA   1803           00499         BTFSC   STATUS, C
+02CB   2???           00500         GOTO    _kp_invalid
+                      00501 
+                      00502         ; if int==50 then frac must be 0
+02CC   083B           00503         MOVF    tmp0, W
+02CD   3A32           00504         XORLW   .50
+02CE   1D03           00505         BTFSS   STATUS, Z
+02CF   2???           00506         GOTO    _kp_accept
+02D0   1283 1303      00507         BANKSEL in_frac
+02D2   08B8           00508         MOVF    in_frac, F
+02D3   1D03           00509         BTFSS   STATUS, Z
+02D4   2???           00510         GOTO    _kp_invalid
+                      00511 
+02D5                  00512 _kp_accept:
+02D5   1283 1303      00513         BANKSEL desired_int
+02D7   083B           00514         MOVF    tmp0, W
+02D8   00A3           00515         MOVWF   desired_int
+                      00516 
+02D9   1283 1303      00517         BANKSEL in_frac
+02DB   0838           00518         MOVF    in_frac, W
+02DC   1283 1303      00519         BANKSEL desired_frac
+02DE   00A4           00520         MOVWF   desired_frac
+                      00521 
+                      00522         ; show desired immediately
+02DF   1283 1303      00523         BANKSEL disp_mode
+02E1   3000           00524         MOVLW   MODE_DESIRED
+02E2   00AA           00525         MOVWF   disp_mode
+02E3   1283 1303      00526         BANKSEL disp_idx
+02E5   01AD           00527         CLRF    disp_idx
+                      00528 
+02E6   1283 1303      00529         BANKSEL sys_flags
+02E8   14AC           00530         BSF     sys_flags, F_DISP_DIRTY
+                      00531 
+02E9   2???           00532         CALL    Temp_ControlUpdate
+02EA   0008           00533         RETURN
+                      00534 
+02EB                  00535 _kp_invalid:
+02EB   1283 1303      00536         BANKSEL error_timer
+02ED   3002           00537         MOVLW   .2               ; 2 seconds
+02EE   00AB           00538         MOVWF   error_timer
+02EF   1283 1303      00539         BANKSEL sys_flags
+02F1   14AC           00540         BSF     sys_flags, F_DISP_DIRTY
+02F2   0008           00541         RETURN
+                      00225         #include "display.asm"
+                      00001 ;============================================================
+                      00002 ; display.asm
+                      00003 ; 4-digit 7-seg multiplex gosterim
+                      00004 ;
+                      00005 ; Buffer:
+                      00006 ;  disp0..disp3 = her hanenin segment pattern'i (RD0..RD7)
+                      00007 ;  Bit7 genelde "dp" (decimal point) icin kullanilir.
+                      00008 ;
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 28
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00009 ; Display_Service:
+                      00010 ;  - her cagrisinda tek bir digit yakar (disp_idx 0..3)
+                      00011 ;  - hizli cagri -> stabil goruntu
+                      00012 ;
+                      00013 ; Display_Rebuild:
+                      00014 ;  - error_timer !=0 ise "EROR"
+                      00015 ;  - degilse disp_mode'a gore:
+                      00016 ;     MODE_DESIRED:  xx.xC
+                      00017 ;     MODE_AMBIENT:  xx.xA
+                      00018 ;     MODE_FAN    :  xxxF
+                      00019 ;============================================================
+                      00020 
+                      00021         #include "common.inc"
+                      00316 ;============================================================
+                      00317 ; common.inc
+                      00318 ; Target  : PIC16F877A
+                      00319 ; Project : Temperature System (Term Project)
+                      00320 ;
+                      00321 ; Bu dosya:
+                      00322 ;  - Konfig bitlerini (tek yerde) tanimlar
+                      00323 ;  - Tum moduller icin ortak sabitleri (MODE_*, NO_KEY, vb.)
+                      00324 ;  - sys_flags bit anlamlarini
+                      00325 ;  - RAM'deki global degiskenleri (CBLOCK 0x20) toplar
+                      00326 ;
+                      00327 ; Not:
+                      00328 ;  - CBLOCK degiskenleri tum .asm modullerinde ortak kullanilir.
+                      00329 ;  - BANKSEL kullanimi ile dogru bank secimi kritik.
+                      00330 ;============================================================
+                      00331 
+Warning[205]: Found directive in column 1. (IFNDEF)
+                      00332 IFNDEF COMMON_INC_LOADED
+                      00333 COMMON_INC_LOADED   EQU     1
+                      00334 
+                      00335         LIST    P=16F877A
+                      00336         #include <P16F877A.INC>
+                      00337 
+                      00338 ;------------ Config (SADECE 1 KERE) ------------
+                      00339         __CONFIG _WDT_OFF & _PWRTE_ON & _CP_OFF & _LVP_OFF & _BODEN_OFF & _HS_OSC
+                      00340 
+                      00341 ;------------ Constants ------------
+                      00342 MODE_DESIRED    EQU     0
+                      00343 MODE_AMBIENT    EQU     1
+                      00344 MODE_FAN        EQU     2
+                      00345 
+                      00346 NO_KEY          EQU     0xFF
+                      00347 
+                      00348 ; sys_flags bitleri (bit=1 iken isaretli/durum aktif):
+                      00349 F_DO_ADC        EQU     0 ; F_DO_ADC      : 1 saniyelik zamanlayici ADC okumasi istiyor (main loop okur)
+                      00350 F_DISP_DIRTY    EQU     1 ; F_DISP_DIRTY  : Ekran icerigi degisti -> Display_Rebuild cagirilacak
+                      00351 F_UART_GOT_FR   EQU     2 ; F_UART_GOT_FR : UART tarafindan yeni fraction (ondalik) geldi
+                      00352 F_UART_GOT_IN   EQU     3 ; F_UART_GOT_IN : UART tarafindan yeni integer geldi
+                      00353    
+                      00354 ; keypad entry_state
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 29
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00355 ENT_IDLE        EQU     0
+                      00356 ENT_D1          EQU     1
+                      00357 ENT_D2          EQU     2
+                      00358 ENT_STAR        EQU     3
+                      00359 ENT_FRAC        EQU     4
+                      00360 ENT_HASH        EQU     5
+                      00361 
+                      00362 ;------------ RAM ------------
+                      00363         CBLOCK  0x20
+                      00364 W_TEMP
+                      00365 STATUS_TEMP
+                      00366 PCLATH_TEMP
+                      00367 
+                      00368 desired_int
+                      00369 desired_frac
+                      00370 ambient_int
+                      00371 ambient_frac
+                      00372 fan_rps
+                      00373 ; desired_int/frac  : kullanici hedefi (xx.x)
+                      00374 ; ambient_int/frac  : LM35'ten okunan ortam (xx.x)
+                      00375 ; fan_rps           : 1 saniyede TMR0 sayimi (yaklasik rps)
+                      00376 
+                      00377 tick100ms
+                      00378 sec_counter
+                      00379 disp_mode
+                      00380 error_timer
+                      00381 sys_flags
+                      00382 ; tick100ms   : Timer1 ile 100ms sayaci (0..9)
+                      00383 ; sec_counter : display mode rotasyonu icin (2 saniyede bir)
+                      00384 ; disp_mode   : 0=desired,1=ambient,2=fan
+                      00385 ; error_timer : 0 degilse Display "EROR"
+                      00386 ; sys_flags   : bayraklar
+                      00387 
+                      00388 disp_idx
+                      00389 disp0
+                      00390 disp1
+                      00391 disp2
+                      00392 disp3
+                      00393 ; disp_idx : multiplex sira (0..3)
+                      00394 ; disp0..3 : RD portuna basilan segment pattern'leri
+                      00395 
+                      00396 key_last
+                      00397 key_ready
+                      00398 key_lock
+                      00399 entry_state
+                      00400 in_d1
+                      00401 in_d2
+                      00402 in_frac
+                      00403 ; key_last   : son kabul edilen tus (ASCII)
+                      00404 ; key_ready  : 1 ise main loop Keypad_Process yapar
+                      00405 ; key_lock   : debounce (1 tus/press)
+                      00406 ; entry_state: A XX*X# state machine
+                      00407 ; in_d1/in_d2/in_frac : girilen rakamlar (binary 0..9)
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 30
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00408 
+                      00409 uart_new_int
+                      00410 uart_new_frac
+                      00411 ; uart_new_int/frac : UART'tan gelen yeni hedef deger (xx.x)
+                      00412 ; tmp0..tmp3        : ortak scratch register'lar
+                      00413 
+                      00414 tmp0
+                      00415 tmp1
+                      00416 tmp2
+                      00417 tmp3
+                      00418         ENDC
+                      00419 
+                      00420 ENDIF
+                      00022 
+                      00023 ; Multiplex gecisi:
+                      00024 ;  once tum digit enable kapatilir (ghosting engellemek icin),
+                      00025 ;  sonra segment pattern RD'ye basilir,
+                      00026 ;  en son ilgili digit enable acilir.
+                      00027 
+                      00028 
+02F3                  00029 Display_Service:
+                      00030         ; digits off
+02F3   1283 1303      00031         BANKSEL PORTC
+02F5   1007           00032         BCF     PORTC,0
+02F6   1087           00033         BCF     PORTC,1
+02F7   1107           00034         BCF     PORTC,2
+02F8   1187           00035         BCF     PORTC,3
+                      00036 
+                      00037         ; W = disp byte
+02F9   1283 1303      00038         BANKSEL disp_idx
+02FB   082D           00039         MOVF    disp_idx, W
+02FC   2???           00040         CALL    Display_GetByte
+                      00041 
+02FD   1283 1303      00042         BANKSEL PORTD
+02FF   0088           00043         MOVWF   PORTD
+                      00044 
+                      00045         ; enable digit
+0300   1283 1303      00046         BANKSEL disp_idx
+0302   082D           00047         MOVF    disp_idx, W
+0303   2???           00048         CALL    Display_EnableDigit
+                      00049 
+                      00050         ; next digit
+0304   1283 1303      00051         BANKSEL disp_idx
+0306   0AAD           00052         INCF    disp_idx, F
+0307   3004           00053         MOVLW   .4
+0308   022D           00054         SUBWF   disp_idx, W
+0309   1D03           00055         BTFSS   STATUS, Z
+030A   0008           00056         RETURN
+030B   01AD           00057         CLRF    disp_idx
+030C   0008           00058         RETURN
+                      00059 
+                      00060 
+                      00061 ; W=0..3 -> returns disp0..disp3 in W
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 31
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+030D                  00062 Display_GetByte:
+030D   00BB           00063         MOVWF   tmp0
+030E   08BB           00064         MOVF    tmp0, F
+030F   1903           00065         BTFSC   STATUS, Z
+0310   2???           00066         GOTO    DGB0
+0311   3001           00067         MOVLW   .1
+0312   063B           00068         XORWF   tmp0, W
+0313   1903           00069         BTFSC   STATUS, Z
+0314   2???           00070         GOTO    DGB1
+0315   3002           00071         MOVLW   .2
+0316   063B           00072         XORWF   tmp0, W
+0317   1903           00073         BTFSC   STATUS, Z
+0318   2???           00074         GOTO    DGB2
+                      00075         ; else 3
+0319   2???           00076         GOTO    DGB3
+                      00077 
+031A                  00078 DGB0:
+031A   1283 1303      00079         BANKSEL disp0
+031C   082E           00080         MOVF    disp0, W
+031D   0008           00081         RETURN
+031E                  00082 DGB1:
+031E   1283 1303      00083         BANKSEL disp1
+0320   082F           00084         MOVF    disp1, W
+0321   0008           00085         RETURN
+0322                  00086 DGB2:
+0322   1283 1303      00087         BANKSEL disp2
+0324   0830           00088         MOVF    disp2, W
+0325   0008           00089         RETURN
+0326                  00090 DGB3:
+0326   1283 1303      00091         BANKSEL disp3
+0328   0831           00092         MOVF    disp3, W
+0329   0008           00093         RETURN
+                      00094 
+                      00095 
+                      00096 ; W=0..3 -> enable RC0..RC3
+032A                  00097 Display_EnableDigit:
+032A   00BB           00098         MOVWF   tmp0
+032B   08BB           00099         MOVF    tmp0, F
+032C   1903           00100         BTFSC   STATUS, Z
+032D   2???           00101         GOTO    ED0
+032E   3001           00102         MOVLW   .1
+032F   063B           00103         XORWF   tmp0, W
+0330   1903           00104         BTFSC   STATUS, Z
+0331   2???           00105         GOTO    ED1
+0332   3002           00106         MOVLW   .2
+0333   063B           00107         XORWF   tmp0, W
+0334   1903           00108         BTFSC   STATUS, Z
+0335   2???           00109         GOTO    ED2
+0336   2???           00110         GOTO    ED3
+                      00111 
+0337                  00112 ED0:
+0337   1283 1303      00113         BANKSEL PORTC
+0339   1407           00114         BSF     PORTC,0
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 32
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+033A   0008           00115         RETURN
+033B                  00116 ED1:
+033B   1283 1303      00117         BANKSEL PORTC
+033D   1487           00118         BSF     PORTC,1
+033E   0008           00119         RETURN
+033F                  00120 ED2:
+033F   1283 1303      00121         BANKSEL PORTC
+0341   1507           00122         BSF     PORTC,2
+0342   0008           00123         RETURN
+0343                  00124 ED3:
+0343   1283 1303      00125         BANKSEL PORTC
+0345   1587           00126         BSF     PORTC,3
+0346   0008           00127         RETURN
+                      00128 
+                      00129 
+0347                  00130 Display_Rebuild:
+0347   1283 1303      00131         BANKSEL error_timer
+0349   08AB           00132         MOVF    error_timer, F
+034A   1903           00133         BTFSC   STATUS, Z
+034B   2???           00134         GOTO    NO_ERROR
+                      00135 
+                      00136         ; EROR
+034C   1283 1303      00137         BANKSEL disp0
+034E   3079           00138         MOVLW   0x79        ; E
+034F   00AE           00139         MOVWF   disp0
+0350   3050           00140         MOVLW   0x50        ; r approx
+0351   00AF           00141         MOVWF   disp1
+0352   303F           00142         MOVLW   0x3F        ; O
+0353   00B0           00143         MOVWF   disp2
+0354   3050           00144         MOVLW   0x50        ; r
+0355   00B1           00145         MOVWF   disp3
+0356   0008           00146         RETURN
+                      00147 
+0357                  00148 NO_ERROR:
+0357   1283 1303      00149         BANKSEL disp_mode
+0359   082A           00150         MOVF    disp_mode, W
+035A   1903           00151         BTFSC   STATUS, Z
+035B   2???           00152         GOTO    BUILD_DES
+                      00153 
+035C   3001           00154         MOVLW   MODE_AMBIENT
+035D   022A           00155         SUBWF   disp_mode, W
+035E   1903           00156         BTFSC   STATUS, Z
+035F   2???           00157         GOTO    BUILD_AMB
+                      00158 
+0360   2???           00159         GOTO    BUILD_FAN
+                      00160 
+0361                  00161 BUILD_DES:
+0361   2???           00162         CALL    BuildTempDesired
+0362   0008           00163         RETURN
+0363                  00164 BUILD_AMB:
+0363   2???           00165         CALL    BuildTempAmbient
+0364   0008           00166         RETURN
+0365                  00167 BUILD_FAN:
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 33
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0365   2???           00168         CALL    BuildFan
+0366   0008           00169         RETURN
+                      00170 
+                      00171 
+0367                  00172 BuildTempDesired:
+0367   1283 1303      00173         BANKSEL desired_int
+0369   0823           00174         MOVF    desired_int, W
+036A   2???           00175         CALL    BinTo2Digits
+                      00176 
+036B   083B           00177         MOVF    tmp0, W
+036C   2???           00178         CALL    DigitToSeg
+036D   1283 1303      00179         BANKSEL disp0
+036F   00AE           00180         MOVWF   disp0
+                      00181 
+0370   083C           00182         MOVF    tmp1, W
+0371   2???           00183         CALL    DigitToSeg
+0372   3880           00184         IORLW   0x80               ; dp ON
+0373   1283 1303      00185         BANKSEL disp1
+0375   00AF           00186         MOVWF   disp1
+                      00187 
+0376   1283 1303      00188         BANKSEL desired_frac
+0378   0824           00189         MOVF    desired_frac, W
+0379   2???           00190         CALL    DigitToSeg
+037A   1283 1303      00191         BANKSEL disp2
+037C   00B0           00192         MOVWF   disp2
+                      00193 
+037D   3039           00194         MOVLW   0x39               ; C
+037E   1283 1303      00195         BANKSEL disp3
+0380   00B1           00196         MOVWF   disp3
+0381   0008           00197         RETURN
+                      00198 
+                      00199 
+0382                  00200 BuildTempAmbient:
+0382   1283 1303      00201         BANKSEL ambient_int
+0384   0825           00202         MOVF    ambient_int, W
+0385   2???           00203         CALL    BinTo2Digits
+                      00204 
+0386   083B           00205         MOVF    tmp0, W
+0387   2???           00206         CALL    DigitToSeg
+0388   1283 1303      00207         BANKSEL disp0
+038A   00AE           00208         MOVWF   disp0
+                      00209 
+038B   083C           00210         MOVF    tmp1, W
+038C   2???           00211         CALL    DigitToSeg
+038D   3880           00212         IORLW   0x80               ; dp ON
+038E   1283 1303      00213         BANKSEL disp1
+0390   00AF           00214         MOVWF   disp1
+                      00215 
+0391   1283 1303      00216         BANKSEL ambient_frac
+0393   0826           00217         MOVF    ambient_frac, W
+0394   2???           00218         CALL    DigitToSeg
+0395   1283 1303      00219         BANKSEL disp2
+0397   00B0           00220         MOVWF   disp2
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 34
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00221 
+0398   3077           00222         MOVLW   0x77               ; A
+0399   1283 1303      00223         BANKSEL disp3
+039B   00B1           00224         MOVWF   disp3
+039C   0008           00225         RETURN
+                      00226 
+                      00227 
+039D                  00228 BuildFan:
+039D   1283 1303      00229         BANKSEL fan_rps
+039F   0827           00230         MOVF    fan_rps, W
+03A0   2???           00231         CALL    BinTo3Digits
+                      00232 
+03A1   083B           00233         MOVF    tmp0, W
+03A2   2???           00234         CALL    DigitToSeg
+03A3   1283 1303      00235         BANKSEL disp0
+03A5   00AE           00236         MOVWF   disp0
+                      00237 
+03A6   083C           00238         MOVF    tmp1, W
+03A7   2???           00239         CALL    DigitToSeg
+03A8   1283 1303      00240         BANKSEL disp1
+03AA   00AF           00241         MOVWF   disp1
+                      00242 
+03AB   083D           00243         MOVF    tmp2, W
+03AC   2???           00244         CALL    DigitToSeg
+03AD   1283 1303      00245         BANKSEL disp2
+03AF   00B0           00246         MOVWF   disp2
+                      00247 
+03B0   3071           00248         MOVLW   0x71               ; F
+03B1   1283 1303      00249         BANKSEL disp3
+03B3   00B1           00250         MOVWF   disp3
+03B4   0008           00251         RETURN
+                      00252 
+                      00253 
+                      00254 ; W=0..99 -> tmp0 tens, tmp1 ones
+03B5                  00255 BinTo2Digits:
+03B5   00BD           00256         MOVWF   tmp2
+03B6   01BB           00257         CLRF    tmp0
+03B7                  00258 B2_LOOP:
+03B7   300A           00259         MOVLW   .10
+03B8   023D           00260         SUBWF   tmp2, W
+03B9   1C03           00261         BTFSS   STATUS, C
+03BA   2???           00262         GOTO    B2_DONE
+03BB   300A           00263         MOVLW   .10
+03BC   02BD           00264         SUBWF   tmp2, F
+03BD   0ABB           00265         INCF    tmp0, F
+03BE   2???           00266         GOTO    B2_LOOP
+03BF                  00267 B2_DONE:
+03BF   083D           00268         MOVF    tmp2, W
+03C0   00BC           00269         MOVWF   tmp1
+03C1   0008           00270         RETURN
+                      00271 
+                      00272 
+                      00273 ; W=0..255 -> tmp0 hundreds, tmp1 tens, tmp2 ones
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 35
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+03C2                  00274 BinTo3Digits:
+03C2   00BE           00275         MOVWF   tmp3
+03C3   01BB           00276         CLRF    tmp0
+03C4   01BC           00277         CLRF    tmp1
+03C5                  00278 B3_H:
+03C5   3064           00279         MOVLW   .100
+03C6   023E           00280         SUBWF   tmp3, W
+03C7   1C03           00281         BTFSS   STATUS, C
+03C8   2???           00282         GOTO    B3_T
+03C9   3064           00283         MOVLW   .100
+03CA   02BE           00284         SUBWF   tmp3, F
+03CB   0ABB           00285         INCF    tmp0, F
+03CC   2???           00286         GOTO    B3_H
+03CD                  00287 B3_T:
+03CD   300A           00288         MOVLW   .10
+03CE   023E           00289         SUBWF   tmp3, W
+03CF   1C03           00290         BTFSS   STATUS, C
+03D0   2???           00291         GOTO    B3_DONE
+03D1   300A           00292         MOVLW   .10
+03D2   02BE           00293         SUBWF   tmp3, F
+03D3   0ABC           00294         INCF    tmp1, F
+03D4   2???           00295         GOTO    B3_T
+03D5                  00296 B3_DONE:
+03D5   083E           00297         MOVF    tmp3, W
+03D6   00BD           00298         MOVWF   tmp2
+03D7   0008           00299         RETURN
+                      00300 
+                      00301 
+                      00302 ; DigitToSeg:
+                      00303 ; IN : W = 0..9
+                      00304 ; OUT: W = 7-seg pattern (common cathode varsayimi)
+                      00305 ; Not: Donen pattern'lerin dp biti (bit7) burada kapali gelir,
+                      00306 ;dp istendigi yerde IORLW 0x80 ile acilir.
+                      00307 
+03D8                  00308 DigitToSeg:
+03D8   1283 1303      00309         BANKSEL tmp0
+03DA   00BB           00310         MOVWF   tmp0
+                      00311 
+03DB   08BB           00312         MOVF    tmp0, F
+03DC   1903           00313         BTFSC   STATUS, Z
+03DD   343F           00314         RETLW   0x3F    ;0
+                      00315 
+03DE   3001           00316         MOVLW   .1
+03DF   063B           00317         XORWF   tmp0, W
+03E0   1903           00318         BTFSC   STATUS, Z
+03E1   3406           00319         RETLW   0x06    ;1
+                      00320 
+03E2   3002           00321         MOVLW   .2
+03E3   063B           00322         XORWF   tmp0, W
+03E4   1903           00323         BTFSC   STATUS, Z
+03E5   345B           00324         RETLW   0x5B    ;2
+                      00325 
+03E6   3003           00326         MOVLW   .3
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 36
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+03E7   063B           00327         XORWF   tmp0, W
+03E8   1903           00328         BTFSC   STATUS, Z
+03E9   344F           00329         RETLW   0x4F    ;3
+                      00330 
+03EA   3004           00331         MOVLW   .4
+03EB   063B           00332         XORWF   tmp0, W
+03EC   1903           00333         BTFSC   STATUS, Z
+03ED   3466           00334         RETLW   0x66    ;4
+                      00335 
+03EE   3005           00336         MOVLW   .5
+03EF   063B           00337         XORWF   tmp0, W
+03F0   1903           00338         BTFSC   STATUS, Z
+03F1   346D           00339         RETLW   0x6D    ;5
+                      00340 
+03F2   3006           00341         MOVLW   .6
+03F3   063B           00342         XORWF   tmp0, W
+03F4   1903           00343         BTFSC   STATUS, Z
+03F5   347D           00344         RETLW   0x7D    ;6
+                      00345 
+03F6   3007           00346         MOVLW   .7
+03F7   063B           00347         XORWF   tmp0, W
+03F8   1903           00348         BTFSC   STATUS, Z
+03F9   3407           00349         RETLW   0x07    ;7
+                      00350 
+03FA   3008           00351         MOVLW   .8
+03FB   063B           00352         XORWF   tmp0, W
+03FC   1903           00353         BTFSC   STATUS, Z
+03FD   347F           00354         RETLW   0x7F    ;8
+                      00355 
+03FE   3009           00356         MOVLW   .9
+03FF   063B           00357         XORWF   tmp0, W
+0400   1903           00358         BTFSC   STATUS, Z
+0401   346F           00359         RETLW   0x6F    ;9
+                      00360 
+0402   3400           00361         RETLW   0x00    ; invalid -> blank
+                      00226         #include "uart.asm"
+                      00001 ;========================
+                      00002 ; uart.asm
+                      00003 ;========================
+                      00004         #include "common.inc"
+                      00421 ;============================================================
+                      00422 ; common.inc
+                      00423 ; Target  : PIC16F877A
+                      00424 ; Project : Temperature System (Term Project)
+                      00425 ;
+                      00426 ; Bu dosya:
+                      00427 ;  - Konfig bitlerini (tek yerde) tanimlar
+                      00428 ;  - Tum moduller icin ortak sabitleri (MODE_*, NO_KEY, vb.)
+                      00429 ;  - sys_flags bit anlamlarini
+                      00430 ;  - RAM'deki global degiskenleri (CBLOCK 0x20) toplar
+                      00431 ;
+                      00432 ; Not:
+                      00433 ;  - CBLOCK degiskenleri tum .asm modullerinde ortak kullanilir.
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 37
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00434 ;  - BANKSEL kullanimi ile dogru bank secimi kritik.
+                      00435 ;============================================================
+                      00436 
+Warning[205]: Found directive in column 1. (IFNDEF)
+                      00437 IFNDEF COMMON_INC_LOADED
+                      00438 COMMON_INC_LOADED   EQU     1
+                      00439 
+                      00440         LIST    P=16F877A
+                      00441         #include <P16F877A.INC>
+                      00442 
+                      00443 ;------------ Config (SADECE 1 KERE) ------------
+                      00444         __CONFIG _WDT_OFF & _PWRTE_ON & _CP_OFF & _LVP_OFF & _BODEN_OFF & _HS_OSC
+                      00445 
+                      00446 ;------------ Constants ------------
+                      00447 MODE_DESIRED    EQU     0
+                      00448 MODE_AMBIENT    EQU     1
+                      00449 MODE_FAN        EQU     2
+                      00450 
+                      00451 NO_KEY          EQU     0xFF
+                      00452 
+                      00453 ; sys_flags bitleri (bit=1 iken isaretli/durum aktif):
+                      00454 F_DO_ADC        EQU     0 ; F_DO_ADC      : 1 saniyelik zamanlayici ADC okumasi istiyor (main loop okur)
+                      00455 F_DISP_DIRTY    EQU     1 ; F_DISP_DIRTY  : Ekran icerigi degisti -> Display_Rebuild cagirilacak
+                      00456 F_UART_GOT_FR   EQU     2 ; F_UART_GOT_FR : UART tarafindan yeni fraction (ondalik) geldi
+                      00457 F_UART_GOT_IN   EQU     3 ; F_UART_GOT_IN : UART tarafindan yeni integer geldi
+                      00458    
+                      00459 ; keypad entry_state
+                      00460 ENT_IDLE        EQU     0
+                      00461 ENT_D1          EQU     1
+                      00462 ENT_D2          EQU     2
+                      00463 ENT_STAR        EQU     3
+                      00464 ENT_FRAC        EQU     4
+                      00465 ENT_HASH        EQU     5
+                      00466 
+                      00467 ;------------ RAM ------------
+                      00468         CBLOCK  0x20
+                      00469 W_TEMP
+                      00470 STATUS_TEMP
+                      00471 PCLATH_TEMP
+                      00472 
+                      00473 desired_int
+                      00474 desired_frac
+                      00475 ambient_int
+                      00476 ambient_frac
+                      00477 fan_rps
+                      00478 ; desired_int/frac  : kullanici hedefi (xx.x)
+                      00479 ; ambient_int/frac  : LM35'ten okunan ortam (xx.x)
+                      00480 ; fan_rps           : 1 saniyede TMR0 sayimi (yaklasik rps)
+                      00481 
+                      00482 tick100ms
+                      00483 sec_counter
+                      00484 disp_mode
+                      00485 error_timer
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 38
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00486 sys_flags
+                      00487 ; tick100ms   : Timer1 ile 100ms sayaci (0..9)
+                      00488 ; sec_counter : display mode rotasyonu icin (2 saniyede bir)
+                      00489 ; disp_mode   : 0=desired,1=ambient,2=fan
+                      00490 ; error_timer : 0 degilse Display "EROR"
+                      00491 ; sys_flags   : bayraklar
+                      00492 
+                      00493 disp_idx
+                      00494 disp0
+                      00495 disp1
+                      00496 disp2
+                      00497 disp3
+                      00498 ; disp_idx : multiplex sira (0..3)
+                      00499 ; disp0..3 : RD portuna basilan segment pattern'leri
+                      00500 
+                      00501 key_last
+                      00502 key_ready
+                      00503 key_lock
+                      00504 entry_state
+                      00505 in_d1
+                      00506 in_d2
+                      00507 in_frac
+                      00508 ; key_last   : son kabul edilen tus (ASCII)
+                      00509 ; key_ready  : 1 ise main loop Keypad_Process yapar
+                      00510 ; key_lock   : debounce (1 tus/press)
+                      00511 ; entry_state: A XX*X# state machine
+                      00512 ; in_d1/in_d2/in_frac : girilen rakamlar (binary 0..9)
+                      00513 
+                      00514 uart_new_int
+                      00515 uart_new_frac
+                      00516 ; uart_new_int/frac : UART'tan gelen yeni hedef deger (xx.x)
+                      00517 ; tmp0..tmp3        : ortak scratch register'lar
+                      00518 
+                      00519 tmp0
+                      00520 tmp1
+                      00521 tmp2
+                      00522 tmp3
+                      00523         ENDC
+                      00524 
+                      00525 ENDIF
+                      00005 
+0403                  00006 UART_Init:
+                      00007         ; 9600 @ 4MHz, BRGH=1 => SPBRG=25  (20MHz ise 129)
+0403   1683 1303      00008         BANKSEL SPBRG
+0405   3019           00009         MOVLW   .25
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0406   0099           00010         MOVWF   SPBRG
+                      00011 
+0407   1683 1303      00012         BANKSEL TXSTA
+0409   3024           00013         MOVLW   b'00100100'     ; BRGH=1, TXEN=1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+040A   0098           00014         MOVWF   TXSTA
+                      00015 
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 39
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+040B   1283 1303      00016         BANKSEL RCSTA
+040D   3090           00017         MOVLW   b'10010000'     ; SPEN=1, CREN=1
+040E   0098           00018         MOVWF   RCSTA
+040F   0008           00019         RETURN
+                      00020 
+0410                  00021 UART_Service:
+0410   1283 1303      00022         BANKSEL RCSTA
+0412   1898           00023         BTFSC   RCSTA, OERR
+0413   2???           00024         GOTO    UART_CLR_OERR
+                      00025 
+0414   1283 1303      00026         BANKSEL PIR1
+0416   1E8C           00027         BTFSS   PIR1, RCIF
+0417   0008           00028         RETURN
+                      00029 
+0418   1283 1303      00030         BANKSEL RCREG
+041A   081A           00031         MOVF    RCREG, W
+041B   2???           00032         CALL    UART_ProcessByte
+041C   0008           00033         RETURN
+                      00034 
+041D                  00035 UART_CLR_OERR:
+041D   1283 1303      00036         BANKSEL RCSTA
+041F   1218           00037         BCF     RCSTA, CREN
+0420   1618           00038         BSF     RCSTA, CREN
+0421   0008           00039         RETURN
+                      00040 
+                      00041 
+0422                  00042 UART_ProcessByte:
+0422   1283 1303      00043         BANKSEL tmp0
+0424   00BB           00044         MOVWF   tmp0
+                      00045 
+                      00046         ; GET
+0425   083B           00047         MOVF    tmp0, W
+0426   3A01           00048         XORLW   0x01
+0427   1903           00049         BTFSC   STATUS, Z
+0428   2???           00050         GOTO    UART_TX_DES_FR
+                      00051 
+0429   083B           00052         MOVF    tmp0, W
+042A   3A02           00053         XORLW   0x02
+042B   1903           00054         BTFSC   STATUS, Z
+042C   2???           00055         GOTO    UART_TX_DES_IN
+                      00056 
+042D   083B           00057         MOVF    tmp0, W
+042E   3A03           00058         XORLW   0x03
+042F   1903           00059         BTFSC   STATUS, Z
+0430   2???           00060         GOTO    UART_TX_AMB_FR
+                      00061 
+0431   083B           00062         MOVF    tmp0, W
+0432   3A04           00063         XORLW   0x04
+0433   1903           00064         BTFSC   STATUS, Z
+0434   2???           00065         GOTO    UART_TX_AMB_IN
+                      00066 
+0435   083B           00067         MOVF    tmp0, W
+0436   3A05           00068         XORLW   0x05
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 40
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0437   1903           00069         BTFSC   STATUS, Z
+0438   2???           00070         GOTO    UART_TX_FAN
+                      00071 
+                      00072         ; SET? bit7=1
+0439   1FBB           00073         BTFSS   tmp0, 7
+043A   0008           00074         RETURN
+                      00075 
+                      00076         ; payload (0..63)
+043B   083B           00077         MOVF    tmp0, W
+043C   393F           00078         ANDLW   b'00111111'
+043D   1283 1303      00079         BANKSEL tmp1
+043F   00BC           00080         MOVWF   tmp1
+                      00081 
+                      00082         ; bit6=1 -> INT, bit6=0 -> FRAC
+0440   1B3B           00083         BTFSC   tmp0, 6
+0441   2???           00084         GOTO    UART_SET_INT
+                      00085 
+0442                  00086 UART_SET_FRAC:
+0442   1283 1303      00087         BANKSEL tmp1
+0444   083C           00088         MOVF    tmp1, W
+0445   1283 1303      00089         BANKSEL uart_new_frac
+0447   00BA           00090         MOVWF   uart_new_frac
+                      00091 
+0448   1283 1303      00092         BANKSEL sys_flags
+044A   152C           00093         BSF     sys_flags, F_UART_GOT_FR
+044B   2???           00094         CALL    UART_TRY_COMMIT
+044C   0008           00095         RETURN
+                      00096 
+044D                  00097 UART_SET_INT:
+044D   1283 1303      00098         BANKSEL tmp1
+044F   083C           00099         MOVF    tmp1, W
+0450   1283 1303      00100         BANKSEL uart_new_int
+0452   00B9           00101         MOVWF   uart_new_int
+                      00102 
+0453   1283 1303      00103         BANKSEL sys_flags
+0455   15AC           00104         BSF     sys_flags, F_UART_GOT_IN
+0456   2???           00105         CALL    UART_TRY_COMMIT
+0457   0008           00106         RETURN
+                      00107 
+                      00108 
+0458                  00109 UART_TRY_COMMIT:
+0458   1283 1303      00110         BANKSEL sys_flags
+045A   1D2C           00111         BTFSS   sys_flags, F_UART_GOT_FR
+045B   0008           00112         RETURN
+045C   1DAC           00113         BTFSS   sys_flags, F_UART_GOT_IN
+045D   0008           00114         RETURN
+                      00115 
+                      00116         ; consume pair
+045E   112C           00117         BCF     sys_flags, F_UART_GOT_FR
+045F   11AC           00118         BCF     sys_flags, F_UART_GOT_IN
+                      00119 
+                      00120         ; frac <= 9 ?
+0460   1283 1303      00121         BANKSEL uart_new_frac
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 41
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0462   300A           00122         MOVLW   .10
+0463   023A           00123         SUBWF   uart_new_frac, W
+0464   1803           00124         BTFSC   STATUS, C
+0465   2???           00125         GOTO    UART_INVALID
+                      00126 
+                      00127         ; int >= 10 ?
+0466   1283 1303      00128         BANKSEL uart_new_int
+0468   300A           00129         MOVLW   .10
+0469   0239           00130         SUBWF   uart_new_int, W
+046A   1C03           00131         BTFSS   STATUS, C
+046B   2???           00132         GOTO    UART_INVALID
+                      00133 
+                      00134         ; int < 50 OR (int==50 and frac==0)
+046C   3032           00135         MOVLW   .50
+046D   0239           00136         SUBWF   uart_new_int, W
+046E   1803           00137         BTFSC   STATUS, C
+046F   2???           00138         GOTO    UART_CHECK50X
+0470   2???           00139         GOTO    UART_ACCEPT
+                      00140 
+0471                  00141 UART_CHECK50X:
+                      00142         ; int > 50 ?
+0471   1283 1303      00143         BANKSEL uart_new_int
+0473   0839           00144         MOVF    uart_new_int, W
+0474   3A32           00145         XORLW   .50
+0475   1D03           00146         BTFSS   STATUS, Z
+0476   2???           00147         GOTO    UART_INVALID
+                      00148 
+                      00149         ; int==50 => frac must be 0
+0477   1283 1303      00150         BANKSEL uart_new_frac
+0479   08BA           00151         MOVF    uart_new_frac, F
+047A   1D03           00152         BTFSS   STATUS, Z
+047B   2???           00153         GOTO    UART_INVALID
+                      00154 
+047C                  00155 UART_ACCEPT:
+047C   1283 1303      00156         BANKSEL uart_new_int
+047E   0839           00157         MOVF    uart_new_int, W
+047F   1283 1303      00158         BANKSEL desired_int
+0481   00A3           00159         MOVWF   desired_int
+                      00160 
+0482   1283 1303      00161         BANKSEL uart_new_frac
+0484   083A           00162         MOVF    uart_new_frac, W
+0485   1283 1303      00163         BANKSEL desired_frac
+0487   00A4           00164         MOVWF   desired_frac
+                      00165 
+0488   1283 1303      00166         BANKSEL sys_flags
+048A   14AC           00167         BSF     sys_flags, F_DISP_DIRTY
+048B   0008           00168         RETURN
+                      00169 
+048C                  00170 UART_INVALID:
+048C   1283 1303      00171         BANKSEL error_timer
+048E   3002           00172         MOVLW   .2
+048F   00AB           00173         MOVWF   error_timer
+0490   1283 1303      00174         BANKSEL sys_flags
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 42
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0492   14AC           00175         BSF     sys_flags, F_DISP_DIRTY
+0493   0008           00176         RETURN
+                      00177 
+                      00178 
+0494                  00179 UART_SendByte:
+0494                  00180 UART_TX_WAIT:
+0494   1283 1303      00181         BANKSEL PIR1
+0496   1E0C           00182         BTFSS   PIR1, TXIF
+0497   2???           00183         GOTO    UART_TX_WAIT
+0498   1283 1303      00184         BANKSEL TXREG
+049A   0099           00185         MOVWF   TXREG
+049B   0008           00186         RETURN
+                      00187 
+049C                  00188 UART_TX_DES_FR:
+049C   1283 1303      00189         BANKSEL desired_frac
+049E   0824           00190         MOVF    desired_frac, W
+049F   2???           00191         CALL    UART_SendByte
+04A0   0008           00192         RETURN
+04A1                  00193 UART_TX_DES_IN:
+04A1   1283 1303      00194         BANKSEL desired_int
+04A3   0823           00195         MOVF    desired_int, W
+04A4   2???           00196         CALL    UART_SendByte
+04A5   0008           00197         RETURN
+04A6                  00198 UART_TX_AMB_FR:
+04A6   1283 1303      00199         BANKSEL ambient_frac
+04A8   0826           00200         MOVF    ambient_frac, W
+04A9   2???           00201         CALL    UART_SendByte
+04AA   0008           00202         RETURN
+04AB                  00203 UART_TX_AMB_IN:
+04AB   1283 1303      00204         BANKSEL ambient_int
+04AD   0825           00205         MOVF    ambient_int, W
+04AE   2???           00206         CALL    UART_SendByte
+04AF   0008           00207         RETURN
+04B0                  00208 UART_TX_FAN:
+04B0   1283 1303      00209         BANKSEL fan_rps
+04B2   0827           00210         MOVF    fan_rps, W
+04B3   2???           00211         CALL    UART_SendByte
+04B4   0008           00212         RETURN
+                      00227 
+3F32                  00228         END
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 43
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADCS2                             00000006
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+B2_DONE                           000003BF
+B2_LOOP                           000003B7
+B3_DONE                           000003D5
+B3_H                              000003C5
+B3_T                              000003CD
+BCLIE                             00000003
+BCLIF                             00000003
+BF                                00000000
+BRGH                              00000002
+BUILD_AMB                         00000363
+BUILD_DES                         00000361
+BUILD_FAN                         00000365
+BinTo2Digits                      000003B5
+BinTo3Digits                      000003C2
+BuildFan                          0000039D
+BuildTempAmbient                  00000382
+BuildTempDesired                  00000367
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCP2CON                           0000001D
+CCP2IE                            00000000
+CCP2IF                            00000000
+CCP2M0                            00000000
+CCP2M1                            00000001
+CCP2M2                            00000002
+CCP2M3                            00000003
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 44
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CCP2X                             00000005
+CCP2Y                             00000004
+CCPR1                             00000015
+CCPR1H                            00000016
+CCPR1L                            00000015
+CCPR2                             0000001B
+CCPR2H                            0000001C
+CCPR2L                            0000001B
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CIS                               00000003
+CKE                               00000006
+CKP                               00000004
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000009C
+CMIE                              00000006
+CMIF                              00000006
+COMMON_INC_LOADED                 00000001
+CREN                              00000004
+CSRC                              00000007
+CVR0                              00000000
+CVR1                              00000001
+CVR2                              00000002
+CVR3                              00000003
+CVRCON                            0000009D
+CVREN                             00000007
+CVROE                             00000006
+CVRR                              00000005
+D                                 00000005
+DATA_ADDRESS                      00000005
+DC                                00000001
+DGB0                              0000031A
+DGB1                              0000031E
+DGB2                              00000322
+DGB3                              00000326
+D_A                               00000005
+D_NOT_A                           00000005
+DigitToSeg                        000003D8
+Display_EnableDigit               0000032A
+Display_GetByte                   0000030D
+Display_Rebuild                   00000347
+Display_Service                   000002F3
+ED0                               00000337
+ED1                               0000033B
+ED2                               0000033F
+ED3                               00000343
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 45
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+ENT_D1                            00000001
+ENT_D2                            00000002
+ENT_FRAC                          00000004
+ENT_HASH                          00000005
+ENT_IDLE                          00000000
+ENT_STAR                          00000003
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+F_DISP_DIRTY                      00000001
+F_DO_ADC                          00000000
+F_UART_GOT_FR                     00000002
+F_UART_GOT_IN                     00000003
+GCEN                              00000007
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+GO_NOT_DONE                       00000002
+I2C_DATA                          00000005
+I2C_READ                          00000002
+I2C_START                         00000003
+I2C_STOP                          00000004
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+ISR                               00000004
+Init                              0000001A
+Keypad_Poll                       00000165
+Keypad_Process                    00000231
+Keypad_RB_ISR                     0000015E
+Keypad_Scan                       00000186
+MODE_AMBIENT                      00000001
+MODE_DESIRED                      00000000
+MODE_FAN                          00000002
+MainLoop                          00000061
+NOT_A                             00000005
+NOT_ADDRESS                       00000005
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 46
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+NOT_W                             00000002
+NOT_WRITE                         00000002
+NO_ERROR                          00000357
+NO_KEY                            000000FF
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+P                                 00000004
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCLATH_TEMP                       00000022
+PCON                              0000008E
+PEIE                              00000006
+PEN                               00000002
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+R                                 00000002
+RA0                               00000000
+RA1                               00000001
+RA2                               00000002
+RA3                               00000003
+RA4                               00000004
+RA5                               00000005
+RB0                               00000000
+RB1                               00000001
+RB2                               00000002
+RB3                               00000003
+RB4                               00000004
+RB5                               00000005
+RB6                               00000006
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 47
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RB7                               00000007
+RBIE                              00000003
+RBIF                              00000000
+RC0                               00000000
+RC1                               00000001
+RC2                               00000002
+RC3                               00000003
+RC4                               00000004
+RC5                               00000005
+RC6                               00000006
+RC7                               00000007
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCEN                              00000003
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RD0                               00000000
+RD1                               00000001
+RD2                               00000002
+RD3                               00000003
+RD4                               00000004
+RD5                               00000005
+RD6                               00000006
+RD7                               00000007
+RE0                               00000000
+RE1                               00000001
+RE2                               00000002
+READ_WRITE                        00000002
+RP0                               00000005
+RP1                               00000006
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_NOT_W                           00000002
+R_W                               00000002
+S                                 00000003
+SEN                               00000000
+SMP                               00000007
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+SSPADD                            00000093
+SSPBUF                            00000013
+SSPCON                            00000014
+SSPCON2                           00000091
+SSPEN                             00000005
+SSPIE                             00000003
+SSPIF                             00000003
+SSPM0                             00000000
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 48
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+SSPM1                             00000001
+SSPM2                             00000002
+SSPM3                             00000003
+SSPOV                             00000006
+SSPSTAT                           00000094
+STATUS                            00000003
+STATUS_TEMP                       00000021
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR1                              0000000E
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISA0                            00000000
+TRISA1                            00000001
+TRISA2                            00000002
+TRISA3                            00000003
+TRISA4                            00000004
+TRISA5                            00000005
+TRISB                             00000086
+TRISB0                            00000000
+TRISB1                            00000001
+TRISB2                            00000002
+TRISB3                            00000003
+TRISB4                            00000004
+TRISB5                            00000005
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 49
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TRISB6                            00000006
+TRISB7                            00000007
+TRISC                             00000087
+TRISC0                            00000000
+TRISC1                            00000001
+TRISC2                            00000002
+TRISC3                            00000003
+TRISC4                            00000004
+TRISC5                            00000005
+TRISC6                            00000006
+TRISC7                            00000007
+TRISD                             00000088
+TRISD0                            00000000
+TRISD1                            00000001
+TRISD2                            00000002
+TRISD3                            00000003
+TRISD4                            00000004
+TRISD5                            00000005
+TRISD6                            00000006
+TRISD7                            00000007
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+Temp_ControlUpdate                0000013D
+Temp_ReadAmbient                  000000BB
+Temp_TMR1_ISR                     00000080
+Temp_TMR1_Reload                  00000079
+UA                                00000001
+UART_ACCEPT                       0000047C
+UART_CHECK50X                     00000471
+UART_CLR_OERR                     0000041D
+UART_INVALID                      0000048C
+UART_Init                         00000403
+UART_ProcessByte                  00000422
+UART_SET_FRAC                     00000442
+UART_SET_INT                      0000044D
+UART_SendByte                     00000494
+UART_Service                      00000410
+UART_TRY_COMMIT                   00000458
+UART_TX_AMB_FR                    000004A6
+UART_TX_AMB_IN                    000004AB
+UART_TX_DES_FR                    0000049C
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 50
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+UART_TX_DES_IN                    000004A1
+UART_TX_FAN                       000004B0
+UART_TX_WAIT                      00000494
+W                                 00000000
+WCOL                              00000007
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+W_TEMP                            00000020
+Z                                 00000002
+_ADD_ACC                          0000012E
+_AsciiDigitToBin                  0000029B
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_BOREN_OFF                        00003FBF
+_BOREN_ON                         00003FFF
+_CONFIG                           00002007
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00001FFF
+_CP_OFF                           00003FFF
+_CP_ON                            00001FFF
+_CommitDesiredIfValid             000002AE
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_DEVID1                           00002006
+_FOSC_EXTRC                       00003FFF
+_FOSC_HS                          00003FFE
+_FOSC_LP                          00003FFC
+_FOSC_XT                          00003FFD
+_HS_OSC                           00003FFE
+_IDLOC0                           00002000
+_IDLOC1                           00002001
+_IDLOC2                           00002002
+_IDLOC3                           00002003
+_KeyMap                           000001ED
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_ReadRow                          000001BE
+_RowMul4                          000001E4
+_WDTE_OFF                         00003FFB
+_WDTE_ON                          00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_1FOURTH                      00003BFF
+_WRT_256                          00003DFF
+_WRT_HALF                         000039FF
+_WRT_OFF                          00003FFF
+_XT_OSC                           00003FFD
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 51
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+__16F877A                         00000001
+_acq                              000000BF
+_bad_digit                        000002AC
+_c0                               000001A1
+_c1                               000001A5
+_c2                               000001AA
+_c3                               000001AF
+_desired_gt                       00000154
+_desired_lt                       00000159
+_digit1                           0000025B
+_digit2                           00000269
+_div10                            00000108
+_div_done                         00000120
+_expect_hash                      00000290
+_expect_star                      00000277
+_frac                             00000282
+_frac_diff                        00000151
+_ge10                             00000113
+_int_diff                         0000014E
+_kp_accept                        000002D5
+_kp_invalid                       000002EB
+_kp_rel                           00000182
+_mode_ok                          000000B3
+_no_adc                           00000072
+_no_disp                          00000078
+_no_err_dec                       0000009E
+_no_key                           0000006B
+_pressed                          000001E1
+_r0                               000001D4
+_r1                               000001D8
+_r2                               000001DD
+_scan_done                        000001B4
+_sec_done                         000000B6
+_sh7                              000000FB
+_start_entry                      00000251
+_wait_adc                         000000C5
+ambient_frac                      00000026
+ambient_int                       00000025
+desired_frac                      00000024
+desired_int                       00000023
+disp0                             0000002E
+disp1                             0000002F
+disp2                             00000030
+disp3                             00000031
+disp_idx                          0000002D
+disp_mode                         0000002A
+entry_state                       00000035
+error_timer                       0000002B
+fan_rps                           00000027
+in_d1                             00000036
+in_d2                             00000037
+in_frac                           00000038
+key_last                          00000032
+MPASM 5.77                          MAIN.ASM   12-30-2025  15:06:14         PAGE 52
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+key_lock                          00000034
+key_ready                         00000033
+sec_counter                       00000029
+sys_flags                         0000002C
+tick100ms                         00000028
+tmp0                              0000003B
+tmp1                              0000003C
+tmp2                              0000003D
+tmp3                              0000003E
+uart_new_frac                     0000003A
+uart_new_int                      00000039
+
+Errors   :     0
+Warnings :     6 reported,     0 suppressed
+Messages :    11 reported,     0 suppressed
+
+
